@@ -117,76 +117,109 @@ function Articulos() {
       </button>
 
       {formVisible && (
-        <div className="modal-form">
-          <h3>Nuevo Artículo</h3>
-          {errorMsg && <p className="error">{errorMsg}</p>}
-          {Object.keys(newArticulo).map(key => (
-            <input
-              key={key}
-              type="text"
-              placeholder={key.replace(/_/g, ' ').toUpperCase()}
-              value={newArticulo[key]}
-              onChange={e => setNewArticulo({ ...newArticulo, [key]: e.target.value })}
-            />
-          ))}
-          <button onClick={handleCreate}>Guardar</button>
-          <button className="cancelar-btn" onClick={() => setFormVisible(false)}>Cancelar</button>
+        <div className="modal is-open" role="dialog" aria-modal="true">
+          <div className="modal-contenido">
+            <div className="modal-header">
+              <h3 className="modal-title">Nuevo Artículo</h3>
+              <button className="modal-close" onClick={() => setFormVisible(false)} aria-label="Cerrar">×</button>
+            </div>
+
+            <div className="modal-body">
+              {errorMsg && <p className="error">{errorMsg}</p>}
+
+              {Object.keys(newArticulo).map((key) => (
+                <input
+                  key={key}
+                  type="text"
+                  placeholder={key.replace(/_/g, ' ').toUpperCase()}
+                  value={newArticulo[key]}
+                  onChange={(e) => setNewArticulo({ ...newArticulo, [key]: e.target.value })}
+                />
+              ))}
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secundario" onClick={() => setFormVisible(false)}>Cancelar</button>
+              <button className="btn-primario" onClick={handleCreate}>Guardar</button>
+            </div>
+          </div>
         </div>
       )}
 
+
       {editMode && (
-        <div className="modal-form">
-          <h3>Editar Artículo</h3>
-          <div>
-            <input 
-              type="text" 
-              placeholder="CÓDIGO A BUSCAR" 
-              value={codigoBusqueda} 
-              onChange={e => setCodigoBusqueda(e.target.value)}
-            />
-            <button onClick={() => {
-              api.get(`/articulos/codigo/${codigoBusqueda}`)
-                .then(res => {
-                  setEditArticulo(res.data);
-                  setEditLocked(false);
-                  setErrorMsg('');
-                })
-                .catch(() => {
-                  setErrorMsg('Artículo no encontrado');
-                  setEditLocked(true);
-                });
-            }}>
-              Buscar
-            </button>
+        <div className="modal is-open" role="dialog" aria-modal="true">
+          <div className="modal-contenido">
+            <div className="modal-header">
+              <h3 className="modal-title">Editar Artículo</h3>
+              <button className="modal-close" onClick={() => setEditMode(false)} aria-label="Cerrar">×</button>
+            </div>
+
+            <div className="modal-body">
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="text"
+                  placeholder="CÓDIGO A BUSCAR"
+                  value={codigoBusqueda}
+                  onChange={(e) => setCodigoBusqueda(e.target.value)}
+                />
+                <button
+                  className="btn-secundario"
+                  onClick={() => {
+                    api.get(`/articulos/codigo/${codigoBusqueda}`)
+                      .then((res) => {
+                        setEditArticulo(res.data);
+                        setEditLocked(false);
+                        setErrorMsg('');
+                      })
+                      .catch(() => {
+                        setErrorMsg('Artículo no encontrado');
+                        setEditLocked(true);
+                      });
+                  }}
+                >
+                  Buscar
+                </button>
+              </div>
+
+              {errorMsg && <p className="error">{errorMsg}</p>}
+
+              {Object.keys(editArticulo).map((key) => (
+                <input
+                  key={key}
+                  type="text"
+                  placeholder={key.replace(/_/g, ' ').toUpperCase()}
+                  value={editArticulo[key] || ''}
+                  onChange={(e) => setEditArticulo({ ...editArticulo, [key]: e.target.value })}
+                  disabled={editLocked || key === 'id_articulo'}
+                />
+              ))}
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secundario" onClick={() => setEditMode(false)}>Cancelar</button>
+              <button
+                className="btn-primario"
+                onClick={() => {
+                  api.put(`/articulos/${editArticulo.id_articulo}`, editArticulo)
+                    .then(() => {
+                      fetchData();
+                      setEditMode(false);
+                      setEditLocked(true);
+                    })
+                    .catch((err) =>
+                      setErrorMsg(err.response?.data?.error || 'Error al editar artículo')
+                    );
+                }}
+                disabled={editLocked}
+              >
+                Guardar cambios
+              </button>
+            </div>
           </div>
-          {errorMsg && <p className="error">{errorMsg}</p>}
-          {Object.keys(editArticulo).map(key => (
-            <input
-              key={key}
-              type="text"
-              placeholder={key.replace(/_/g, ' ').toUpperCase()}
-              value={editArticulo[key] || ''}
-              onChange={e => setEditArticulo({ ...editArticulo, [key]: e.target.value })}
-              disabled={editLocked || key === 'id_articulo'}
-            />
-          ))}
-          <button 
-            onClick={() => {
-              api.put(`/articulos/${editArticulo.id_articulo}`, editArticulo)
-                .then(() => {
-                  fetchData();
-                  setEditMode(false);
-                  setEditLocked(true);
-                })
-                .catch(err => setErrorMsg(err.response?.data?.error || 'Error al editar artículo'));
-            }}
-            disabled={editLocked}
-          >
-            Guardar cambios
-          </button>
-          <button className="cancelar-btn" onClick={() => setEditMode(false)}>Cancelar</button>
         </div>
       )}
+
 
       {/* Checklist de columnas */}
       <div className="checklist-panel">
