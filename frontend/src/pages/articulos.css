@@ -1,0 +1,82 @@
+.articulos-container {
+  margin-top: 20px;
+}
+
+.nuevo-btn {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background-color: #007acc;
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.borrar-btn {
+  padding: 5px 8px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.form-crear {
+  margin-bottom: 15px;
+  display: flex;
+  gap: 10px;
+}
+
+.form-crear input {
+  padding: 6px;
+}
+
+.form-crear button {
+  padding: 6px 10px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.tabla-articulos {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tabla-articulos th, .tabla-articulos td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: left;
+}
+
+.tabla-articulos th {
+  background-color: #f2f2f2;
+}
+
+.tabla-articulos input {
+  width: 100%;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.paginado {
+  margin-top: 15px;
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.paginado button {
+  padding: 6px 10px;
+  border: 1px solid #007acc;
+  background-color: white;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.paginado button.activo {
+  background-color: #007acc;
+  color: white;
+  font-weight: bold;
+}

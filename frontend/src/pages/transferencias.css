@@ -1,0 +1,41 @@
+.transferencias-page {
+  padding: 20px;
+}
+
+.acciones {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.tabla-transferencias {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+.tabla-transferencias th, .tabla-transferencias td {
+  border: 1px solid #ccc;
+  padding: 10px;
+  text-align: center;
+}
+
+.tabla-transferencias th {
+  background-color: #f2f2f2;
+}
+
+.modal-form {
+  position: fixed;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  padding: 30px;
+  border: 1px solid #aaa;
+  box-shadow: 0 0 10px #888;
+  z-index: 10;
+}
+
+.modal-form h3 {
+  margin-top: 0;
+}
