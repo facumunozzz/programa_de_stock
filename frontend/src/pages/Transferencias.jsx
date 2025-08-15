@@ -1,14 +1,13 @@
+// frontend/src/pages/Transferencias.jsx
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/axiosConfig';
-import TransferenciaForm from '../components/TransferenciaForm';
-import TransferenciaDetalle from '../components/TransferenciaDetalle';
 import './transferencias.css';
 
 function Transferencias() {
+  const navigate = useNavigate();
   const [transferencias, setTransferencias] = useState([]);
   const [filtro, setFiltro] = useState('');
-  const [detalleID, setDetalleID] = useState(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
 
   const fetchTransferencias = () => {
     api.get('/transferencias')
@@ -21,14 +20,17 @@ function Transferencias() {
   }, []);
 
   const transferenciasFiltradas = transferencias.filter(t =>
-    Object.values(t).some(val => String(val).toLowerCase().includes(filtro.toLowerCase()))
+    Object.values(t).some(val => String(val ?? '').toLowerCase().includes(filtro.toLowerCase()))
   );
 
   return (
     <div className="transferencias-page">
       <h2>Transferencias</h2>
+
       <div className="acciones">
-        <button onClick={() => setMostrarForm(true)}>Nueva transferencia</button>
+        <button onClick={() => navigate('/transferencias/nueva')}>
+          Nueva transferencia
+        </button>
         <input
           type="text"
           placeholder="Filtrar transferencias"
@@ -37,17 +39,6 @@ function Transferencias() {
         />
       </div>
 
-      {mostrarForm && (
-        <TransferenciaForm onClose={() => {
-          setMostrarForm(false);
-          fetchTransferencias();
-        }} />
-      )}
-
-      {detalleID && (
-        <TransferenciaDetalle id={detalleID} onClose={() => setDetalleID(null)} />
-      )}
-
       <table className="tabla-transferencias">
         <thead>
           <tr>
@@ -55,19 +46,15 @@ function Transferencias() {
             <th>Origen</th>
             <th>Destino</th>
             <th>Nro Transferencia</th>
-            <th>Ver Detalle</th>
           </tr>
         </thead>
         <tbody>
           {transferenciasFiltradas.map(t => (
-            <tr key={t.id}>
-              <td>{new Date(t.fecha).toLocaleString()}</td>
+            <tr key={t.numero_transferencia ?? t.id}>
+              <td>{t.fecha ? new Date(t.fecha).toLocaleString('es-AR') : ''}</td>
               <td>{t.origen}</td>
               <td>{t.destino}</td>
-              <td>{t.numero_transferencia}</td>
-              <td>
-                <button onClick={() => setDetalleID(t.id)}>Ver</button>
-              </td>
+              <td>{t.numero_transferencia ?? t.id}</td>
             </tr>
           ))}
         </tbody>

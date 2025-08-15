@@ -5,7 +5,7 @@ import './../App.jsx';
 function Navbar() {
   return (
     <nav className="navbar">
-      <h2>ERP</h2>
+      <h2>SZ Consultores</h2>
       <ul>
         <li><NavLink to="/articulos">Artículos</NavLink></li>
         <li><NavLink to="/stock">Stock</NavLink></li>

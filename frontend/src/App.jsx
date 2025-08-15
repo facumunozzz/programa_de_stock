@@ -12,6 +12,7 @@ import Kardex from './pages/Kardex';
 import Produccion from './pages/Produccion';
 import Ajustes from './pages/Ajustes';
 import Movimientos from './pages/Movimientos';
+import NuevaTransferencia from './pages/NuevaTransferencia';
 
 function AppRoutes() {
   const location = useLocation();
@@ -27,10 +28,11 @@ function AppRoutes() {
       <Navbar />
       <div className="container">
         <Routes>
-          <Route path="/" element={<Navigate to={localStorage.getItem('ultimaRuta') || "/stock"} />} />
+          <Route path="/" element={<Navigate to={localStorage.getItem('ultimaRuta') || '/stock'} />} />
           <Route path="/articulos" element={<Articulos />} />
           <Route path="/stock" element={<Stock />} />
           <Route path="/transferencias" element={<Transferencias />} />
+          <Route path="/transferencias/nueva" element={<NuevaTransferencia />} />
           <Route path="/kardex" element={<Kardex />} />
           <Route path="/produccion" element={<Produccion />} />
           <Route path="/ajustes" element={<Ajustes />} />
@@ -42,7 +44,7 @@ function AppRoutes() {
   );
 }
 
-function App() {
+export default function App() {
   return (
     <Router>
       <AppRoutes />
@@ -50,4 +52,3 @@ function App() {
   );
 }
 
-export default App;

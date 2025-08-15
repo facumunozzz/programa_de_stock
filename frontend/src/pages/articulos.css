@@ -186,3 +186,33 @@
 .btn-cancelar:hover {
   background-color: #5a6268;
 }
+
+/* ===== Scroll horizontal solo en la tabla ===== */
+.tabla-articulos-container {
+  overflow-x: auto;                 /* scroll horizontal solo acá */
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+}
+
+/* La tabla ocupa su ancho “real”; si cabe, 100% */
+.tabla-articulos {
+  width: max-content;               /* permite desbordar horizontalmente si es ancha */
+  min-width: 100%;                  /* pero llena el contenedor cuando es más angosta */
+  border-collapse: collapse;
+}
+
+/* Evita saltos raros de la página completa */
+body, .articulos-container {
+  overflow-x: hidden;               /* sin scroll horizontal global */
+}
+
+/* (Opcional) Evitar cortes de columnas en títulos; podés quitarlo si preferís wrap */
+.tabla-articulos th, .tabla-articulos td {
+  white-space: nowrap;
+}
+
+/* Si querés que la descripción sí pueda cortar línea, agrega una clase al <td> de descripción y desactiva nowrap: */
+/* .descripcion-cell { white-space: normal; } */

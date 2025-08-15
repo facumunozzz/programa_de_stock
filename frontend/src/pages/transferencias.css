@@ -39,3 +39,26 @@
 .modal-form h3 {
   margin-top: 0;
 }
+
+.nueva-transferencia-page { display: grid; gap: 14px; }
+.nt-header { display:flex; justify-content:space-between; align-items:center; }
+.nt-volver { border:1px solid #cbd5e1; background:#fff; padding:8px 12px; border-radius:8px; cursor:pointer; }
+.nt-error { background:#fee2e2; border:1px solid #fecaca; color:#b91c1c; padding:8px 10px; border-radius:8px; }
+
+.nt-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; display:grid; gap:12px; }
+.nt-row { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+.nt-field { position:relative; display:flex; flex-direction:column; gap:6px; }
+.nt-field.small { max-width: 160px; }
+.nt-field input { padding:10px; border:1px solid #d1d5db; border-radius:8px; }
+.nt-field input:focus { border-color:#007acc; box-shadow: 0 0 0 3px rgba(0,122,204,.15); }
+.nt-picked { font-size:.9rem; color:#065f46; }
+
+.nt-sugs { position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #e5e7eb; border-radius:8px; z-index:10; max-height:200px; overflow:auto; }
+.nt-sugs li { padding:8px 10px; cursor:pointer; }
+.nt-sugs li:hover { background:#f3f4f6; }
+
+.nt-actions { display:flex; align-items:flex-end; gap:8px; }
+.btn-light { padding:9px 14px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; cursor:pointer; font-weight:600; }
+.btn-light:hover { background:#f3f4f6; }
+.btn-primary { padding:9px 14px; border:none; border-radius:8px; background:#1f8a36; color:#fff; cursor:pointer; font-weight:600; }
+.btn-primary:disabled { opacity:.5; cursor:not-allowed; }

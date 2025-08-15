@@ -236,6 +236,7 @@ function Articulos() {
         ))}
       </div>
 
+        <div className="tabla-articulos-container">
       <table className="tabla-articulos">
         <thead>
           <tr>
@@ -272,6 +273,7 @@ function Articulos() {
           ))}
         </tbody>
       </table>
+      </div>
 
       <div className="paginado">
         {Array.from({ length: totalPages }, (_, i) => (
