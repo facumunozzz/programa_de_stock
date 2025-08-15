@@ -1,8 +1,11 @@
+// backend/routes/ajustes.js
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/ajustes');
 
 router.get('/', controller.getAll);
-// TODO: agregar más rutas para ajustes
+router.get('/:id', controller.getById);    // id = numero_ajuste
+router.post('/', controller.create);
 
 module.exports = router;
+

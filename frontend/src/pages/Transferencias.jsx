@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axiosConfig';
-import './transferencias.css';
+import './../styles/transferencias.css';
 
 function Transferencias() {
   const navigate = useNavigate();
@@ -25,7 +25,7 @@ function Transferencias() {
 
   return (
     <div className="transferencias-page">
-      <h2>Transferencias</h2>
+      <h2 className="module-title">Transferencias</h2>
 
       <div className="acciones">
         <button onClick={() => navigate('/transferencias/nueva')}>

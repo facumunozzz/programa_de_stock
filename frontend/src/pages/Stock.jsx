@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/axiosConfig';
 import * as XLSX from 'xlsx';
-import './stock.css';
+import './../styles/stock.css';
 
 function Stock() {
   const [stock, setStock] = useState([]);
@@ -73,7 +73,7 @@ function Stock() {
 
   return (
     <div className="stock-container">
-      <h2>Stock en Depósitos</h2>
+      <h2 className="module-title">Stock en Depósitos</h2>
 
       <div className="acciones">
         <button onClick={() => setMostrarModal(true)}>Crear depósito</button>

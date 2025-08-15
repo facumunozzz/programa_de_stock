@@ -62,3 +62,39 @@
 .btn-light:hover { background:#f3f4f6; }
 .btn-primary { padding:9px 14px; border:none; border-radius:8px; background:#1f8a36; color:#fff; cursor:pointer; font-weight:600; }
 .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+
+h2.module-title {
+  font-family: 'Poppins', 'Segoe UI', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 800; /* más gordita */
+  letter-spacing: 0.5px;
+  background: linear-gradient(90deg, #004080, #0059b3); /* degradado más oscuro */
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 1rem;
+  position: relative;
+  padding-bottom: 0.4rem;
+  text-transform: uppercase;
+}
+
+/* Línea inferior animada */
+h2.module-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0%;
+  height: 3px;
+  background: linear-gradient(90deg, #004080, #0059b3); /* mismo tono oscuro */
+  border-radius: 2px;
+  transition: width 0.4s ease-in-out;
+}
+
+h2.module-title:hover::after {
+  width: 100%;
+}
+
+/* Sombra suave para destacar */
+h2.module-title {
+  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+}

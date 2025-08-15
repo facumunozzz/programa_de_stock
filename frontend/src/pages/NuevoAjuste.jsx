@@ -1,20 +1,19 @@
-// frontend/src/pages/NuevaTransferencia.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axiosConfig";
 import "./../styles/transferencias.css";
 
-export default function NuevaTransferencia() {
+export default function NuevoAjuste() {
   const navigate = useNavigate();
 
   const [depositos, setDepositos] = useState([]);
-  const [origenId, setOrigenId] = useState("");
-  const [destinoId, setDestinoId] = useState("");
+  const [depositoId, setDepositoId] = useState("");
 
   const [codigo, setCodigo] = useState("");
   const [descripcion, setDescripcion] = useState("");
-  const [cantidad, setCantidad] = useState("");
+  const [cantidad, setCantidad] = useState(""); // puede ser negativa
 
+  const [motivo, setMotivo] = useState("");
   const [items, setItems] = useState([]);
   const [errorMsg, setErrorMsg] = useState("");
   const [errorDepositos, setErrorDepositos] = useState("");
@@ -51,19 +50,16 @@ export default function NuevaTransferencia() {
     return () => clearTimeout(t);
   }, [codigo]);
 
-  const grabarYContinuar = () => {
+  const cargarYContinuar = () => {
     setErrorMsg("");
 
-    const oId = Number(origenId);
-    const dId = Number(destinoId);
-
-    if (!oId || !dId) return setErrorMsg("Seleccioná ORIGEN y DESTINO.");
-    if (oId === dId) return setErrorMsg("Origen y destino no pueden ser iguales.");
+    const dId = Number(depositoId);
+    if (!dId) return setErrorMsg("Seleccioná el DEPÓSITO.");
 
     const c = (codigo || "").trim().toUpperCase();
     const q = Number(cantidad);
     if (!c) return setErrorMsg("Ingresá el CÓDIGO.");
-    if (!q || q <= 0) return setErrorMsg("La CANTIDAD debe ser mayor que 0.");
+    if (!Number.isFinite(q) || q === 0) return setErrorMsg("La CANTIDAD no puede ser 0 (puede ser negativa o positiva).");
 
     setItems((prev) => [
       ...prev,
@@ -83,34 +79,33 @@ export default function NuevaTransferencia() {
     try {
       setErrorMsg("");
 
-      const oId = Number(origenId);
-      const dId = Number(destinoId);
-      if (!oId || !dId) return setErrorMsg("Seleccioná ORIGEN y DESTINO.");
-      if (items.length === 0) return setErrorMsg('Agregá ítems con "Grabar y continuar".');
+      const dId = Number(depositoId);
+      if (!dId) return setErrorMsg("Seleccioná el DEPÓSITO.");
+      if (items.length === 0) return setErrorMsg('Agregá ítems con "Cargar y continuar".');
 
       const body = {
-        origen_id: oId,
-        destino_id: dId,
+        deposito_id: dId,
+        motivo: motivo || null,
         items: items.map((it) => ({
           cod_articulo: it.cod_articulo,
           cantidad: it.cantidad,
         })),
       };
 
-      const res = await api.post("/transferencias", body);
+      const res = await api.post("/ajustes", body);
       alert(
-        "Transferencia creada: " +
-          (res.data?.transferencia?.numero_transferencia ||
+        "Ajuste creado: " +
+          (res.data?.ajuste?.numero_ajuste ||
             res.data?.message ||
             "OK")
       );
-      navigate("/transferencias");
+      navigate("/ajustes");
     } catch (err) {
       const msg =
         err.response?.data?.error ||
         err.response?.data?.detalle ||
         err.message ||
-        "Error al confirmar la transferencia";
+        "Error al confirmar el ajuste";
       setErrorMsg(msg);
     }
   };
@@ -118,8 +113,8 @@ export default function NuevaTransferencia() {
   return (
     <div className="nueva-transferencia-page">
       <div className="nt-header">
-        <h2 className="module-title">Nueva Transferencia</h2>
-        <button className="nt-volver" onClick={() => navigate("/transferencias")}>
+        <h2 className="module-title">Nuevo Ajuste</h2>
+        <button className="nt-volver" onClick={() => navigate("/ajustes")}>
           ← Volver
         </button>
       </div>
@@ -130,13 +125,13 @@ export default function NuevaTransferencia() {
       <div className="nt-card">
         <div className="nt-row">
           <div className="nt-field">
-            <label>Origen</label>
+            <label>Origen (Depósito)</label>
             <select
-              value={origenId}
-              onChange={(e) => setOrigenId(e.target.value)}
+              value={depositoId}
+              onChange={(e) => setDepositoId(e.target.value)}
               disabled={bloqueadoCabecera}
             >
-              <option value="">-- Seleccioná depósito origen --</option>
+              <option value="">-- Seleccioná depósito --</option>
               {depositos.map((d) => (
                 <option key={d.id_deposito} value={d.id_deposito}>
                   {d.nombre}
@@ -145,20 +140,14 @@ export default function NuevaTransferencia() {
             </select>
           </div>
 
-          <div className="nt-field">
-            <label>Destino</label>
-            <select
-              value={destinoId}
-              onChange={(e) => setDestinoId(e.target.value)}
-              disabled={bloqueadoCabecera}
-            >
-              <option value="">-- Seleccioná depósito destino --</option>
-              {depositos.map((d) => (
-                <option key={d.id_deposito} value={d.id_deposito}>
-                  {d.nombre}
-                </option>
-              ))}
-            </select>
+          <div className="nt-field grow">
+            <label>Motivo</label>
+            <input
+              type="text"
+              value={motivo}
+              placeholder="Escribí el motivo del ajuste…"
+              onChange={(e) => setMotivo(e.target.value)}
+            />
           </div>
         </div>
 
@@ -184,26 +173,27 @@ export default function NuevaTransferencia() {
           </div>
 
           <div className="nt-field small">
-            <label>Cantidad</label>
+            <label>Cantidad (+/-)</label>
             <input
               type="number"
-              min="1"
               step="1"
               value={cantidad}
-              onChange={(e) =>
-                setCantidad(e.target.value.replace(/[^0-9]/g, ""))
-              }
+              onChange={(e) => {
+                // permito negativos y positivos, solo enteros
+                const v = e.target.value;
+                if (/^-?\d*$/.test(v)) setCantidad(v);
+              }}
             />
           </div>
 
           <div className="nt-actions">
-            <button className="btn-light" onClick={grabarYContinuar}>
-              Grabar y continuar
+            <button className="btn-light" onClick={cargarYContinuar}>
+              Cargar y continuar
             </button>
             <button
               className="btn-primary"
               onClick={confirmar}
-              disabled={!origenId || !destinoId || items.length === 0}
+              disabled={!depositoId || items.length === 0}
             >
               Confirmar
             </button>
@@ -226,7 +216,7 @@ export default function NuevaTransferencia() {
             <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan="4">No hay ítems. Usá "Grabar y continuar".</td>
+                  <td colSpan="4">No hay ítems. Usá "Cargar y continuar".</td>
                 </tr>
               ) : (
                 items.map((it, idx) => (

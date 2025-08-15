@@ -10,7 +10,6 @@ function Navbar() {
         <li><NavLink to="/articulos">Artículos</NavLink></li>
         <li><NavLink to="/stock">Stock</NavLink></li>
         <li><NavLink to="/transferencias">Transferencias</NavLink></li>
-        <li><NavLink to="/kardex">Kardex</NavLink></li>
         <li><NavLink to="/produccion">Producción</NavLink></li>
         <li><NavLink to="/ajustes">Ajustes</NavLink></li>
         <li><NavLink to="/movimientos">Movimientos</NavLink></li>

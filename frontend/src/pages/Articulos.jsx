@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/axiosConfig';
-import './articulos.css';
+import './../styles/articulos.css';
 
 function Articulos() {
   const [articulos, setArticulos] = useState([]);
@@ -106,7 +106,7 @@ function Articulos() {
 
   return (
     <div className="articulos-container">
-      <h2>Artículos</h2>
+      <h2 className="module-title">Artículos</h2>
 
       <button className="nuevo-btn" onClick={() => { setFormVisible(!formVisible); setEditMode(false); }}>
         {formVisible ? 'Cancelar' : 'Crear nuevo artículo'}

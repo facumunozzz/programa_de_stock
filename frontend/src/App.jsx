@@ -8,11 +8,11 @@ import './App.css';
 import Articulos from './pages/Articulos';
 import Stock from './pages/Stock';
 import Transferencias from './pages/Transferencias';
-import Kardex from './pages/Kardex';
 import Produccion from './pages/Produccion';
 import Ajustes from './pages/Ajustes';
 import Movimientos from './pages/Movimientos';
 import NuevaTransferencia from './pages/NuevaTransferencia';
+import NuevoAjuste from './pages/NuevoAjuste';
 
 function AppRoutes() {
   const location = useLocation();
@@ -33,9 +33,9 @@ function AppRoutes() {
           <Route path="/stock" element={<Stock />} />
           <Route path="/transferencias" element={<Transferencias />} />
           <Route path="/transferencias/nueva" element={<NuevaTransferencia />} />
-          <Route path="/kardex" element={<Kardex />} />
           <Route path="/produccion" element={<Produccion />} />
           <Route path="/ajustes" element={<Ajustes />} />
+          <Route path="/ajustes/nuevo" element={<NuevoAjuste />} />
           <Route path="/movimientos" element={<Movimientos />} />
         </Routes>
       </div>
