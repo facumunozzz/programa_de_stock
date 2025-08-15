@@ -13,6 +13,7 @@ import Ajustes from './pages/Ajustes';
 import Movimientos from './pages/Movimientos';
 import NuevaTransferencia from './pages/NuevaTransferencia';
 import NuevoAjuste from './pages/NuevoAjuste';
+import DetalleAjuste from './components/DetalleAjuste';
 
 function AppRoutes() {
   const location = useLocation();
@@ -37,6 +38,7 @@ function AppRoutes() {
           <Route path="/ajustes" element={<Ajustes />} />
           <Route path="/ajustes/nuevo" element={<NuevoAjuste />} />
           <Route path="/movimientos" element={<Movimientos />} />
+          <Route path="/ajustes/:id" element={<DetalleAjuste />} />
         </Routes>
       </div>
       <ToastContainer position="top-right" autoClose={3000} />
