@@ -11,7 +11,7 @@ function Transferencias() {
 
   const fetchTransferencias = () => {
     api.get('/transferencias')
-      .then(res => setTransferencias(res.data))
+      .then(res => setTransferencias(res.data || []))
       .catch(err => console.error(err));
   };
 
@@ -49,14 +49,22 @@ function Transferencias() {
           </tr>
         </thead>
         <tbody>
-          {transferenciasFiltradas.map(t => (
-            <tr key={t.numero_transferencia ?? t.id}>
-              <td>{t.fecha ? new Date(t.fecha).toLocaleString('es-AR') : ''}</td>
-              <td>{t.origen}</td>
-              <td>{t.destino}</td>
-              <td>{t.numero_transferencia ?? t.id}</td>
-            </tr>
-          ))}
+          {transferenciasFiltradas.map(t => {
+            const id = t.numero_transferencia ?? t.id;
+            return (
+              <tr
+                key={id}
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/transferencias/${id}`)}
+                title="Ver detalle"
+              >
+                <td>{t.fecha ? new Date(t.fecha).toLocaleString('es-AR') : ''}</td>
+                <td>{t.origen}</td>
+                <td>{t.destino}</td>
+                <td>{id}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

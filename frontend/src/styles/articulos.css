@@ -1,15 +1,17 @@
+/* === Contenedor principal === */
 .articulos-container {
   margin-top: 20px;
 }
 
+/* === Botones === */
 .nuevo-btn {
   margin-bottom: 10px;
   padding: 8px 12px;
   background-color: #007acc;
   color: white;
   border: none;
-  cursor: pointer;
   border-radius: 5px;
+  cursor: pointer;
 }
 
 .borrar-btn {
@@ -39,15 +41,28 @@
   cursor: pointer;
 }
 
+/* === Tabla de artículos === */
+.tabla-articulos-container {
+  overflow-x: auto;               /* scroll horizontal solo acá */
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+}
+
 .tabla-articulos {
-  width: 100%;
+  width: max-content;             /* permite desbordar horizontalmente si es ancha */
+  min-width: 100%;                /* pero llena el contenedor cuando es más angosta */
   border-collapse: collapse;
 }
 
-.tabla-articulos th, .tabla-articulos td {
+.tabla-articulos th,
+.tabla-articulos td {
   border: 1px solid #ccc;
   padding: 8px;
   text-align: left;
+  white-space: nowrap;            /* evita cortes raros */
 }
 
 .tabla-articulos th {
@@ -60,19 +75,20 @@
   box-sizing: border-box;
 }
 
+/* === Paginado === */
 .paginado {
   margin-top: 15px;
   display: flex;
-  gap: 5px;
   flex-wrap: wrap;
+  gap: 5px;
 }
 
 .paginado button {
   padding: 6px 10px;
   border: 1px solid #007acc;
   background-color: white;
-  cursor: pointer;
   border-radius: 3px;
+  cursor: pointer;
 }
 
 .paginado button.activo {
@@ -81,9 +97,9 @@
   font-weight: bold;
 }
 
-/* ======= Modales ======= */
+/* === Modales === */
 .modal {
-  display: none; /* Oculto por defecto */
+  display: none;                  /* oculto por defecto */
   position: fixed;
   z-index: 1000;
   left: 0;
@@ -134,6 +150,7 @@
   cursor: pointer;
   color: #666;
 }
+
 .cerrar-modal:hover {
   color: #000;
 }
@@ -170,6 +187,10 @@
   cursor: pointer;
 }
 
+.btn-guardar:hover {
+  background-color: #218838;
+}
+
 .btn-cancelar {
   background-color: #6c757d;
   color: #fff;
@@ -179,53 +200,24 @@
   cursor: pointer;
 }
 
-.btn-guardar:hover {
-  background-color: #218838;
-}
-
 .btn-cancelar:hover {
   background-color: #5a6268;
 }
 
-/* ===== Scroll horizontal solo en la tabla ===== */
-.tabla-articulos-container {
-  overflow-x: auto;                 /* scroll horizontal solo acá */
-  max-width: 100%;
-  -webkit-overflow-scrolling: touch;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #fff;
-}
-
-/* La tabla ocupa su ancho “real”; si cabe, 100% */
-.tabla-articulos {
-  width: max-content;               /* permite desbordar horizontalmente si es ancha */
-  min-width: 100%;                  /* pero llena el contenedor cuando es más angosta */
-  border-collapse: collapse;
-}
-
-/* Evita saltos raros de la página completa */
-body, .articulos-container {
-  overflow-x: hidden;               /* sin scroll horizontal global */
-}
-
-/* (Opcional) Evitar cortes de columnas en títulos; podés quitarlo si preferís wrap */
-.tabla-articulos th, .tabla-articulos td {
-  white-space: nowrap;
-}
-
+/* === Títulos de módulo === */
 h2.module-title {
   font-family: 'Poppins', 'Segoe UI', sans-serif;
   font-size: 1.8rem;
-  font-weight: 800; /* más gordita */
+  font-weight: 800; 
   letter-spacing: 0.5px;
-  background: linear-gradient(90deg, #004080, #0059b3); /* degradado más oscuro */
+  background: linear-gradient(90deg, #004080, #0059b3);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 1rem;
-  position: relative;
   padding-bottom: 0.4rem;
   text-transform: uppercase;
+  position: relative;
+  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
 }
 
 /* Línea inferior animada */
@@ -236,7 +228,7 @@ h2.module-title::after {
   left: 0;
   width: 0%;
   height: 3px;
-  background: linear-gradient(90deg, #004080, #0059b3); /* mismo tono oscuro */
+  background: linear-gradient(90deg, #004080, #0059b3);
   border-radius: 2px;
   transition: width 0.4s ease-in-out;
 }
@@ -245,7 +237,83 @@ h2.module-title:hover::after {
   width: 100%;
 }
 
-/* Sombra suave para destacar */
-h2.module-title {
-  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+/* === Checklist columnas en una sola fila === */
+.checklist-panel {
+  display: flex;
+  flex-wrap: nowrap;              /* nunca bajar */
+  overflow-x: auto;               /* scroll horizontal si no entra */
+  gap: 8px;
+  margin: 10px 0;
+  padding: 8px;
+  background: #f9fafb;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* Scroll personalizado */
+.checklist-panel::-webkit-scrollbar {
+  height: 6px;
+}
+.checklist-panel::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 3px;
+}
+.checklist-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.checklist-panel label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #2d3748;
+  cursor: pointer;
+  flex-shrink: 0;                 /* nunca se rompa */
+  padding: 2px 6px;
+  transition: background 0.2s ease;
+}
+
+.checklist-panel label:hover {
+  background: #f0f4f8;
+  border-radius: 6px;
+}
+
+/* Checkboxes custom */
+.checklist-panel input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.checklist-panel input[type="checkbox"] + span {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #4a5568;
+  border-radius: 3px;
+  display: inline-block;
+  position: relative;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.checklist-panel input[type="checkbox"]:checked + span {
+  background-color: #007acc;
+  border-color: #007acc;
+}
+
+.checklist-panel input[type="checkbox"]:checked + span::after {
+  content: "✔";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -60%);
+  font-size: 10px;
+  color: white;
+}
+
+.checklist-panel label span.text {
+  color: #2d3748;
 }

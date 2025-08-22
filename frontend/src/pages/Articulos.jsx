@@ -221,20 +221,21 @@ function Articulos() {
       )}
 
 
-      {/* Checklist de columnas */}
-      <div className="checklist-panel">
-        {Object.keys(newArticulo).map(col => (
-          <label key={col}>
-            <input
-              type="checkbox"
-              checked={visibleColumns.includes(col) || col === 'id_articulo'}
-              onChange={() => toggleColumn(col)}
-              disabled={col === 'id_articulo'}
-            />
-            {col.replace(/_/g, ' ').toUpperCase()}
-          </label>
-        ))}
-      </div>
+        <div className="checklist-panel">
+          {Object.keys(newArticulo).map(col => (
+            <label key={col}>
+              <input
+                type="checkbox"
+                checked={visibleColumns.includes(col) || col === 'id_articulo'}
+                onChange={() => toggleColumn(col)}
+                disabled={col === 'id_articulo'}
+              />
+              <span></span>
+              <span className="text">{col.replace(/_/g, ' ').toUpperCase()}</span>
+            </label>
+          ))}
+        </div>
+
 
         <div className="tabla-articulos-container">
       <table className="tabla-articulos">
