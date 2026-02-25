@@ -2,6 +2,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const path = require("path"); // ✅ NUEVO
 
 const app = express();
 
@@ -31,7 +32,9 @@ const remitosRouter = require("./routes/remitos");
 const ubicacionesRouter = require("./routes/ubicaciones");
 const dropboxMetaUsers = require("./routes/dropboxMeta");
 
-// Mount
+// =====================
+// 1) BACKEND ROUTES (igual que hoy)
+// =====================
 app.use("/dropbox", dropboxMetaUsers);
 app.use("/articulos", articulosRouter);
 app.use("/depositos", depositosRouter);
@@ -63,13 +66,53 @@ app.get("/articulos/codigo/direct/:cod?", (req, res) => {
 // Healthcheck sencillo (opcional)
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
+// =====================
+// 2) SERVIR FRONT (Vite dist)  ✅ NUEVO
+// =====================
+const distPath = path.join(__dirname, "..", "frontend", "dist");
+app.use(express.static(distPath));
+
+// Lista de prefijos del backend (para que el fallback NO se los coma) ✅ NUEVO
+const API_PREFIXES = [
+  "/dropbox",
+  "/articulos",
+  "/depositos",
+  "/stock",
+  "/transferencias",
+  "/movimientos",
+  "/produccion",
+  "/ajustes",
+  "/fabrica",
+  "/auth",
+  "/users",
+  "/admin",
+  "/utilidades",
+  "/articulo-clasificaciones",
+  "/clasificaciones",
+  "/remitos",
+  "/ubicaciones",
+  "/__routes",
+  "/health",
+];
+
+// SPA fallback: si NO es una ruta del backend, devolvemos index.html ✅ NUEVO
+app.get("*", (req, res, next) => {
+  const p = req.path || "/";
+
+  if (API_PREFIXES.some((pref) => p === pref || p.startsWith(pref + "/"))) {
+    return next(); // deja 404 backend si no existe
+  }
+
+  return res.sendFile(path.join(distPath, "index.html"));
+});
+
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+// ✅ escuchá en 0.0.0.0 para que te entre desde otra PC
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Servidor corriendo en http://0.0.0.0:${PORT}`);
 
   // ✅ Scheduler: corre a las 12:00 y 15:30
-  // (asegurate de haber creado ./jobs/consumoProduccion.job.js)
   try {
     const { startConsumoProduccionJobs } = require("./jobs/consumoProduccion.job");
     startConsumoProduccionJobs();
