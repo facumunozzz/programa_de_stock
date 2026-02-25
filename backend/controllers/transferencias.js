@@ -1,242 +1,486 @@
 // backend/controllers/transferencias.js
-const { sql, poolConnect, getPool } = require('../db');
+const { sql, poolConnect, getPool } = require("../db");
 
-const toDb = v => (v == null || String(v).trim() === '' ? null : String(v).trim());
-const up   = v => (toDb(v)?.toUpperCase() ?? null);
+function asInt(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.trunc(n) : NaN;
+}
+const toUpperTrim = (v) => String(v ?? "").trim().toUpperCase();
 
-// ============ LISTADO CABECERAS ============
-exports.getAll = async (req, res) => {
+// ============================================================================
+// GET /transferencias
+// ============================================================================
+exports.getAll = async (_req, res) => {
   try {
     await poolConnect;
     const pool = await getPool();
     const r = await pool.request().query(`
-      SELECT 
-        numero_transferencia AS id,   -- alias para el front
-        numero_transferencia,
-        origen,
-        destino,
-        fecha
+      SELECT id, numero_transferencia, origen, destino, fecha,
+             id_ubicacion_origen, id_ubicacion_destino
       FROM dbo.transferencias
-      ORDER BY fecha DESC, numero_transferencia DESC
+      ORDER BY fecha DESC, id DESC
     `);
-    res.json(r.recordset);
+    res.json(r.recordset || []);
   } catch (err) {
-    console.error('transferencias.getAll:', err);
-    res.status(500).json({ error: 'Error al listar transferencias', detalle: err.message });
+    console.error("transferencias.getAll:", err);
+    res.status(500).json({
+      error: "Error al listar transferencias",
+      detalle: err.message,
+    });
   }
 };
 
-// ============ DETALLE ============
+// ============================================================================
+// GET /transferencias/:id  (cabecera + detalle)
+// ============================================================================
 exports.getById = async (req, res) => {
   try {
-    const numero = Number(req.params.id);
-    if (!Number.isInteger(numero)) return res.status(400).json({ error: 'Número inválido' });
+    const id = asInt(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "ID inválido" });
 
     await poolConnect;
     const pool = await getPool();
 
-    const cab = await pool.request()
-      .input('n', sql.Int, numero)
+    const cab = await pool
+      .request()
+      .input("id", sql.Int, id)
       .query(`
-        SELECT 
-          numero_transferencia AS id,
-          numero_transferencia,
-          origen,
-          destino,
-          fecha
+        SELECT id, numero_transferencia, origen, destino, fecha,
+               id_ubicacion_origen, id_ubicacion_destino
         FROM dbo.transferencias
-        WHERE numero_transferencia = @n
+        WHERE id = @id
       `);
-    if (!cab.recordset.length) return res.status(404).json({ error: 'Transferencia no encontrada' });
 
-    const det = await pool.request()
-      .input('n', sql.Int, numero)
+    if (!cab.recordset.length)
+      return res.status(404).json({ error: "Transferencia no encontrada" });
+
+    // ✅ schema real: transferencias_detalle tiene articulo_id (no codigo)
+    const det = await pool
+      .request()
+      .input("id", sql.Int, id)
       .query(`
         SELECT 
-          transferencia_id,
-          cod_articulo,
-          descripcion,
-          cantidad
-        FROM dbo.transferencia_detalles
-        WHERE transferencia_id = @n
-        ORDER BY cod_articulo
+          a.codigo,
+          a.descripcion,
+          d.cantidad
+        FROM dbo.transferencias_detalle d
+        JOIN dbo.articulos a ON a.id_articulo = d.articulo_id
+        WHERE d.transferencia_id = @id
+        ORDER BY a.codigo
       `);
 
-    res.json({ cabecera: cab.recordset[0], detalle: det.recordset });
+    res.json({ cabecera: cab.recordset[0], detalle: det.recordset || [] });
   } catch (err) {
-    console.error('transferencias.getById:', err);
-    res.status(500).json({ error: 'Error al obtener detalle', detalle: err.message });
+    console.error("transferencias.getById:", err);
+    res.status(500).json({
+      error: "Error al obtener transferencia",
+      detalle: err.message,
+    });
   }
 };
 
-// ============ CREAR (CONFIRMAR) ============
-// body: { origen_id, destino_id, items: [{ cod_articulo, cantidad }] }
+// ============================================================================
+// GET /transferencias/ubicaciones/:depositoId
+// ============================================================================
+exports.getUbicacionesByDeposito = async (req, res) => {
+  try {
+    const depositoId = asInt(req.params.depositoId);
+    if (!Number.isFinite(depositoId))
+      return res.status(400).json({ error: "Depósito inválido" });
+
+    await poolConnect;
+    const pool = await getPool();
+
+    const r = await pool
+      .request()
+      .input("dep", sql.Int, depositoId)
+      .query(`
+        SELECT id_ubicacion, id_deposito, nombre
+        FROM dbo.ubicaciones
+        WHERE id_deposito = @dep AND activa = 1
+        ORDER BY 
+          CASE WHEN UPPER(LTRIM(RTRIM(nombre))) = 'GENERAL' THEN 0 ELSE 1 END,
+          nombre
+      `);
+
+    res.json(r.recordset || []);
+  } catch (err) {
+    console.error("transferencias.getUbicacionesByDeposito:", err);
+    res.status(500).json({
+      error: "Error al listar ubicaciones",
+      detalle: err.message,
+    });
+  }
+};
+
+// ============================================================================
+// GET /transferencias/articulo?codigo=XXX
+// (autocompletar descripción por código o código de barra)
+// ============================================================================
+exports.getArticuloByCodigo = async (req, res) => {
+  try {
+    const q = toUpperTrim(req.query?.codigo);
+    if (!q) return res.status(400).json({ error: "Debe indicar ?codigo=" });
+
+    await poolConnect;
+    const pool = await getPool();
+
+    // Busca por codigo o cod_barra si existe
+    const r = await pool
+      .request()
+      .input("q", sql.VarChar, q)
+      .query(`
+        SELECT TOP 1
+          id_articulo,
+          UPPER(LTRIM(RTRIM(codigo))) AS codigo,
+          descripcion
+        FROM dbo.articulos
+        WHERE UPPER(LTRIM(RTRIM(codigo))) = @q
+           OR (cod_barra IS NOT NULL AND UPPER(LTRIM(RTRIM(cod_barra))) = @q)
+        ORDER BY id_articulo DESC
+      `);
+
+    if (!r.recordset.length) return res.status(404).json({ error: "Artículo no encontrado" });
+
+    res.json(r.recordset[0]);
+  } catch (err) {
+    console.error("transferencias.getArticuloByCodigo:", err);
+    res.status(500).json({ error: "Error al buscar artículo", detalle: err.message });
+  }
+};
+
+// ============================================================================
+// POST /transferencias
+// body:
+// {
+//   origen_id, destino_id,
+//   id_ubicacion_origen?: null,
+//   id_ubicacion_destino?: null,
+//   items: [{ codigo, cantidad }]
+// }
+// ============================================================================
+// ============================================================================
+// POST /transferencias
+// body:
+// {
+//   origen_id, destino_id,
+//   id_ubicacion_origen?: null,
+//   id_ubicacion_destino?: null,
+//   items: [{ codigo, cantidad }]
+// }
+// ============================================================================
+
 exports.create = async (req, res) => {
-  const { origen_id, destino_id, items } = req.body || {};
+  const usuario =
+    req.user?.username ??
+    req.user?.email ??
+    req.user?.name ??
+    null;
 
-  if (!origen_id || !destino_id || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: 'Datos incompletos: origen_id, destino_id e items son obligatorios' });
+  const origenId = asInt(req.body?.origen_id);
+  const destinoId = asInt(req.body?.destino_id);
+
+  const ubicO = req.body?.id_ubicacion_origen == null ? null : asInt(req.body.id_ubicacion_origen);
+  const ubicD = req.body?.id_ubicacion_destino == null ? null : asInt(req.body.id_ubicacion_destino);
+
+  const itemsRaw = Array.isArray(req.body?.items) ? req.body.items : [];
+
+  if (!Number.isFinite(origenId) || !Number.isFinite(destinoId)) {
+    return res.status(400).json({ error: "Debe indicar depósito origen y destino" });
   }
-  if (Number(origen_id) === Number(destino_id)) {
-    return res.status(400).json({ error: 'El depósito origen y destino no pueden ser iguales' });
+  if (ubicO !== null && !Number.isFinite(ubicO)) return res.status(400).json({ error: "Ubicación origen inválida" });
+  if (ubicD !== null && !Number.isFinite(ubicD)) return res.status(400).json({ error: "Ubicación destino inválida" });
+
+  const items = itemsRaw
+    .map((it) => ({ codigo: toUpperTrim(it.codigo), cantidad: asInt(it.cantidad) }))
+    .filter((it) => it.codigo && Number.isFinite(it.cantidad) && it.cantidad > 0);
+
+  if (!items.length) {
+    return res.status(400).json({ error: "Debe incluir items con cantidad > 0" });
   }
 
-  const normItems = items.map(it => ({
-    cod: up(it.cod_articulo),
-    cant: Number(it.cantidad) || 0,
-  })).filter(it => it.cod && it.cant > 0);
-
-  if (!normItems.length) return res.status(400).json({ error: 'Items inválidos' });
+  // Consolidar items por código
+  const agg = new Map();
+  for (const it of items) agg.set(it.codigo, (agg.get(it.codigo) || 0) + it.cantidad);
+  const itemsMerged = Array.from(agg.entries()).map(([codigo, cantidad]) => ({ codigo, cantidad }));
 
   let trans;
   try {
     await poolConnect;
     const pool = await getPool();
+
     trans = new sql.Transaction(pool);
     await trans.begin();
 
-    // 1) Nombres de depósitos (se guardan como texto en transferencias)
-    const rqDepO = new sql.Request(trans);
-    const depO = await rqDepO.input('o', sql.Int, origen_id).query(`
-      SELECT id_deposito, nombre FROM dbo.depositos WHERE id_deposito = @o
-    `);
-    if (!depO.recordset.length) { await trans.rollback(); return res.status(400).json({ error: `Depósito origen inexistente: ${origen_id}` }); }
+    const execQ = async (sqlText, bindFn) => {
+      const r = new sql.Request(trans);
+      if (bindFn) bindFn(r);
+      return r.query(sqlText);
+    };
 
-    const rqDepD = new sql.Request(trans);
-    const depD = await rqDepD.input('d', sql.Int, destino_id).query(`
-      SELECT id_deposito, nombre FROM dbo.depositos WHERE id_deposito = @d
-    `);
-    if (!depD.recordset.length) { await trans.rollback(); return res.status(400).json({ error: `Depósito destino inexistente: ${destino_id}` }); }
+    // ---------------------------------------
+    // Helper MERGE sobre dbo.stock (FUENTE REAL)
+    // ---------------------------------------
+    const upsertStockDelta = async ({ idDeposito, idArticulo, idUbicacion, delta }) => {
+      await execQ(
+        `
+        MERGE dbo.stock WITH (HOLDLOCK) AS t
+        USING (SELECT @dep AS id_deposito, @art AS id_articulo, @ub AS id_ubicacion) AS s
+          ON (
+            t.id_deposito = s.id_deposito
+            AND t.id_articulo = s.id_articulo
+            AND t.id_ubicacion = s.id_ubicacion
+          )
+        WHEN MATCHED THEN
+          UPDATE SET cantidad = t.cantidad + @d
+        WHEN NOT MATCHED THEN
+          INSERT (id_deposito, id_articulo, id_ubicacion, cantidad)
+          VALUES (s.id_deposito, s.id_articulo, s.id_ubicacion, @d);
+        `,
+        (r) =>
+          r
+            .input("dep", sql.Int, idDeposito)
+            .input("art", sql.Int, idArticulo)
+            .input("ub", sql.Int, idUbicacion)
+            .input("d", sql.Int, delta)
+      );
+    };
 
-    const nombreOrigen  = depO.recordset[0].nombre;
-    const nombreDestino = depD.recordset[0].nombre;
+    // ---------------------------------------
+    // Depósitos
+    // ---------------------------------------
+    const deps = await execQ(`SELECT id_deposito, nombre FROM dbo.depositos`);
+    const depMap = new Map(deps.recordset.map((d) => [Number(d.id_deposito), d.nombre]));
 
-    // 2) Resolver artículos por código (traigo también descripción)
-    const cods = normItems.map(i => i.cod);
-    const placeholders = cods.map((_, i) => `@c${i}`).join(',');
-    const rqArts = new sql.Request(trans);
-    cods.forEach((c, i) => rqArts.input(`c${i}`, sql.VarChar, c));
-    const arts = await rqArts.query(`
-      SELECT 
-        id_articulo,
-        UPPER(LTRIM(RTRIM(cod_articulo))) AS cod,
-        descripcion
-      FROM dbo.articulos
-      WHERE UPPER(LTRIM(RTRIM(cod_articulo))) IN (${placeholders})
-    `);
-
-    const byCode = new Map(arts.recordset.map(r => [r.cod, { id_articulo: r.id_articulo, descripcion: r.descripcion }]));
-    const faltantes = normItems.filter(i => !byCode.has(i.cod)).map(i => i.cod);
-    if (faltantes.length) {
+    if (!depMap.has(origenId)) {
       await trans.rollback();
-      return res.status(400).json({ error: 'Códigos inexistentes', detalle: faltantes });
+      return res.status(400).json({ error: "Depósito origen inexistente" });
+    }
+    if (!depMap.has(destinoId)) {
+      await trans.rollback();
+      return res.status(400).json({ error: "Depósito destino inexistente" });
     }
 
-    // 3) Validar stock suficiente en ORIGEN
-    for (const it of normItems) {
-      const { id_articulo } = byCode.get(it.cod);
-      const rqChk = new sql.Request(trans);
-      const chk = await rqChk
-        .input('idArt', sql.Int, id_articulo)
-        .input('idDep', sql.Int, origen_id)
-        .query(`
-          SELECT ISNULL(SUM(cantidad),0) AS q
-          FROM dbo.stock
-          WHERE id_articulo = @idArt AND id_deposito = @idDep
-        `);
-      const disponible = Number(chk.recordset[0]?.q || 0);
-      if (disponible < it.cant) {
+    // ---------------------------------------
+    // Ubicaciones (si vienen null, buscamos GENERAL; si no hay, primera activa)
+    // ---------------------------------------
+    async function resolveUbicacionOrGeneral(idDeposito, idUbicacionNullable) {
+      if (idUbicacionNullable != null) {
+        const u = await execQ(
+          `
+          SELECT id_ubicacion, id_deposito, nombre
+          FROM dbo.ubicaciones
+          WHERE id_ubicacion = @uid AND activa = 1
+          `,
+          (r) => r.input("uid", sql.Int, idUbicacionNullable)
+        );
+        if (!u.recordset.length) return null;
+        if (Number(u.recordset[0].id_deposito) !== Number(idDeposito)) return null;
+        return u.recordset[0];
+      }
+
+      const g = await execQ(
+        `
+        SELECT TOP 1 id_ubicacion, id_deposito, nombre
+        FROM dbo.ubicaciones
+        WHERE id_deposito = @dep
+          AND activa = 1
+          AND UPPER(LTRIM(RTRIM(nombre))) = 'GENERAL'
+        ORDER BY id_ubicacion
+        `,
+        (r) => r.input("dep", sql.Int, idDeposito)
+      );
+
+      if (g.recordset[0]) return g.recordset[0];
+
+      const any = await execQ(
+        `
+        SELECT TOP 1 id_ubicacion, id_deposito, nombre
+        FROM dbo.ubicaciones
+        WHERE id_deposito = @dep AND activa = 1
+        ORDER BY id_ubicacion
+        `,
+        (r) => r.input("dep", sql.Int, idDeposito)
+      );
+
+      return any.recordset[0] || null;
+    }
+
+    const uOrigen = await resolveUbicacionOrGeneral(origenId, ubicO);
+    const uDestino = await resolveUbicacionOrGeneral(destinoId, ubicD);
+    
+    if (Number(origenId) === Number(destinoId)) {
+      if (Number(uOrigen.id_ubicacion) === Number(uDestino.id_ubicacion)) {
         await trans.rollback();
         return res.status(400).json({
-          error: 'Stock insuficiente en depósito origen',
-          detalle: { cod_articulo: it.cod, requerido: it.cant, disponible }
+          error: "Origen y destino no pueden ser el mismo depósito y la misma ubicación.",
         });
       }
     }
 
-    // 4) Generar próximo numero_transferencia (MAX+1) con lock
-    const rqNro = new sql.Request(trans);
-    const nroRes = await rqNro.query(`
-      SELECT ISNULL(MAX(numero_transferencia), 0) + 1 AS nextNro
-      FROM dbo.transferencias WITH (UPDLOCK, HOLDLOCK)
-    `);
-    const nextNro = Number(nroRes.recordset[0].nextNro);
+    if (!uOrigen) {
+      await trans.rollback();
+      return res.status(400).json({
+        error: "Ubicación origen inválida o no pertenece al depósito",
+      });
+    }
+    if (!uDestino) {
+      await trans.rollback();
+      return res.status(400).json({
+        error: "Ubicación destino inválida o no pertenece al depósito",
+      });
+    }
 
-    // 5) Insert cabecera (guarda NOMBRES)
-    const rqCab = new sql.Request(trans);
-    await rqCab
-      .input('nro', sql.Int, nextNro)
-      .input('origNom', sql.VarChar, nombreOrigen)
-      .input('destNom', sql.VarChar, nombreDestino)
-      .query(`
-        INSERT INTO dbo.transferencias (numero_transferencia, origen, destino, fecha)
-        VALUES (@nro, @origNom, @destNom, GETDATE())
-      `);
+    // ---------------------------------------
+    // Validar artículos por código
+    // ---------------------------------------
+    const inList = itemsMerged.map((_, i) => `@c${i}`).join(",");
+    const arts = await execQ(
+      `
+      SELECT id_articulo, UPPER(LTRIM(RTRIM(codigo))) AS codigo, descripcion
+      FROM dbo.articulos
+      WHERE UPPER(LTRIM(RTRIM(codigo))) IN (${inList})
+      `,
+      (r) => itemsMerged.forEach((it, i) => r.input(`c${i}`, sql.VarChar, it.codigo))
+    );
 
-    // 6) Detalle + ajustes de stock
-    for (const it of normItems) {
-      const { id_articulo, descripcion } = byCode.get(it.cod);
+    const artIdByCodigo = new Map(arts.recordset.map((a) => [a.codigo, Number(a.id_articulo)]));
+    const faltan = itemsMerged.filter((it) => !artIdByCodigo.has(it.codigo)).map((it) => it.codigo);
 
-      // Detalle
-      const rqDet = new sql.Request(trans);
-      await rqDet
-        .input('nro', sql.Int, nextNro)
-        .input('cod', sql.VarChar, it.cod)
-        .input('desc', sql.VarChar, descripcion || '')
-        .input('cant', sql.Int, it.cant)
-        .query(`
-          INSERT INTO dbo.transferencia_detalles (transferencia_id, cod_articulo, descripcion, cantidad)
-          VALUES (@nro, @cod, @desc, @cant)
-        `);
+    if (faltan.length) {
+      await trans.rollback();
+      return res.status(400).json({ error: "Códigos inexistentes", detalle: faltan });
+    }
 
-      // Resta en origen
-      const rqO = new sql.Request(trans);
-      await rqO
-        .input('idDepO', sql.Int, origen_id)
-        .input('idArtO', sql.Int, id_articulo)
-        .query(`
-          IF NOT EXISTS (SELECT 1 FROM dbo.stock WHERE id_deposito = @idDepO AND id_articulo = @idArtO)
-            INSERT INTO dbo.stock (id_deposito, id_articulo, cantidad) VALUES (@idDepO, @idArtO, 0);
-          UPDATE dbo.stock
-             SET cantidad = cantidad - ${it.cant}
-           WHERE id_deposito = @idDepO AND id_articulo = @idArtO;
-        `);
+    // ---------------------------------------
+    // ✅ Validar stock en ubicación ORIGEN usando dbo.stock
+    // (id_deposito + id_ubicacion + id_articulo)
+    // ---------------------------------------
+    const faltantesStock = [];
+    for (const it of itemsMerged) {
+      const idArt = artIdByCodigo.get(it.codigo);
 
-      // Suma en destino
-      const rqD = new sql.Request(trans);
-      await rqD
-        .input('idDepD', sql.Int, destino_id)
-        .input('idArtD', sql.Int, id_articulo)
-        .query(`
-          IF NOT EXISTS (SELECT 1 FROM dbo.stock WHERE id_deposito = @idDepD AND id_articulo = @idArtD)
-            INSERT INTO dbo.stock (id_deposito, id_articulo, cantidad) VALUES (@idDepD, @idArtD, 0);
-          UPDATE dbo.stock
-             SET cantidad = cantidad + ${it.cant}
-           WHERE id_deposito = @idDepD AND id_articulo = @idArtD;
-        `);
+      const chk = await execQ(
+        `
+        SELECT ISNULL(SUM(cantidad),0) AS q
+        FROM dbo.stock WITH (UPDLOCK, HOLDLOCK)
+        WHERE id_deposito = @dep
+          AND id_ubicacion = @uO
+          AND id_articulo = @a1
+        `,
+        (r) =>
+          r
+            .input("dep", sql.Int, origenId)
+            .input("uO", sql.Int, Number(uOrigen.id_ubicacion))
+            .input("a1", sql.Int, Number(idArt))
+      );
+
+      const disp = Number(chk.recordset[0]?.q || 0);
+      if (disp < it.cantidad) {
+        faltantesStock.push({
+          codigo: it.codigo,
+          requerido: it.cantidad,
+          disponible: disp,
+        });
+      }
+    }
+
+    if (faltantesStock.length) {
+      await trans.rollback();
+      return res.status(400).json({
+        error: "Stock insuficiente en ubicación origen",
+        faltantes: faltantesStock,
+      });
+    }
+
+    // ---------------------------------------
+    // Cabecera
+    // ---------------------------------------
+    const origenTxt = `${depMap.get(origenId)} - ${uOrigen.nombre}`;
+    const destinoTxt = `${depMap.get(destinoId)} - ${uDestino.nombre}`;
+
+    const ins = await execQ(
+      `
+      INSERT INTO dbo.transferencias (origen, destino, fecha, id_ubicacion_origen, id_ubicacion_destino, usuario)
+      OUTPUT INSERTED.id AS id
+      VALUES (@origen, @destino, GETDATE(), @uO2, @uD2, @usr)
+      `,
+      (r) =>
+        r
+          .input("origen", sql.VarChar, origenTxt)
+          .input("destino", sql.VarChar, destinoTxt)
+          .input("uO2", sql.Int, Number(uOrigen.id_ubicacion))
+          .input("uD2", sql.Int, Number(uDestino.id_ubicacion))
+          .input("usr", sql.VarChar, usuario)
+    );
+
+    const transferenciaId = Number(ins.recordset[0].id);
+
+    await execQ(
+      `UPDATE dbo.transferencias SET numero_transferencia = CAST(id AS VARCHAR(20)) WHERE id = @id`,
+      (r) => r.input("id", sql.Int, transferenciaId)
+    );
+
+    // ---------------------------------------
+    // Detalle + movimientos (SOLO dbo.stock)
+    // ---------------------------------------
+    for (const it of itemsMerged) {
+      const idArt = artIdByCodigo.get(it.codigo);
+      const qty = Number(it.cantidad);
+
+      await execQ(
+        `
+        INSERT INTO dbo.transferencias_detalle (transferencia_id, articulo_id, cantidad)
+        VALUES (@tid, @artId, @qty)
+        `,
+        (r) =>
+          r
+            .input("tid", sql.Int, transferenciaId)
+            .input("artId", sql.Int, Number(idArt))
+            .input("qty", sql.Int, qty)
+      );
+
+      // (-) stock origen (dep+ubic)
+      await upsertStockDelta({
+        idDeposito: origenId,
+        idArticulo: Number(idArt),
+        idUbicacion: Number(uOrigen.id_ubicacion),
+        delta: -qty,
+      });
+
+      // (+) stock destino (dep+ubic)
+      await upsertStockDelta({
+        idDeposito: destinoId,
+        idArticulo: Number(idArt),
+        idUbicacion: Number(uDestino.id_ubicacion),
+        delta: qty,
+      });
     }
 
     await trans.commit();
 
-    // 7) Devolver cabecera creada
-    const creado = await (await getPool()).request()
-      .input('n', sql.Int, nextNro)
-      .query(`
-        SELECT 
-          numero_transferencia AS id,
-          numero_transferencia,
-          origen,
-          destino,
-          fecha
-        FROM dbo.transferencias
-        WHERE numero_transferencia = @n
-      `);
-
-    return res.status(201).json({ message: 'Transferencia creada', transferencia: creado.recordset[0] });
-
+    res.status(201).json({
+      message: "Transferencia creada",
+      id: transferenciaId,
+      cabecera: {
+        id: transferenciaId,
+        numero_transferencia: String(transferenciaId),
+        fecha: new Date(),
+        origen: origenTxt,
+        destino: destinoTxt,
+        id_ubicacion_origen: Number(uOrigen.id_ubicacion),
+        id_ubicacion_destino: Number(uDestino.id_ubicacion),
+        usuario,
+      },
+    });
   } catch (err) {
-    console.error('transferencias.create:', err);
-    try { if (trans) await trans.rollback(); } catch {}
-    return res.status(500).json({ error: 'Error al crear transferencia', detalle: err.message });
+    try {
+      if (trans) await trans.rollback();
+    } catch {}
+    console.error("transferencias.create:", err);
+    res.status(500).json({
+      error: "Error al crear transferencia",
+      detalle: err.message,
+    });
   }
 };

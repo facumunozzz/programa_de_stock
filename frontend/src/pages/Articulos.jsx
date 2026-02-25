@@ -1,294 +1,270 @@
-import React, { useEffect, useState } from 'react';
-import api from '../api/axiosConfig';
-import './../styles/articulos.css';
+import React, { useEffect, useMemo, useState } from "react";
+import api from "../api/axiosConfig";
+import "./../styles/articulos.css";
 
-function Articulos() {
+import ArticuloCrearModal from "../components/ArticuloCrearModal";
+import ArticuloEditarModal from "../components/ArticuloEditarModal";
+import ArticuloEliminarModal from "../components/ArticuloEliminarModal";
+
+const CAMPOS_OCULTOS = ["almacen", "cantidad", "traspasa", "ubicacion"]; // traspasa fuera
+
+export default function Articulos() {
   const [articulos, setArticulos] = useState([]);
   const [filtered, setFiltered] = useState([]);
+  const [openEliminar, setOpenEliminar] = useState(false);
+  const [rowEliminar, setRowEliminar] = useState(null);
+
+  // ================= PAGINADO PRO (copiado de Stock) =================
   const [currentPage, setCurrentPage] = useState(1);
-  const [formVisible, setFormVisible] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [editLocked, setEditLocked] = useState(true);
-  const [codigoBusqueda, setCodigoBusqueda] = useState('');
-  const [newArticulo, setNewArticulo] = useState({
-    cod_articulo: '',
-    descripcion: '',
-    cod_modelo: '',
-    color: '',
-    talle: '',
-    cod_barra: '',
-    tipo: '',
-    familia: '',
-    subfamilia: '',
-    material: '',
-    iibb_aplica: '',
-    lista_precios_aplica: ''
-  });
-  const [editArticulo, setEditArticulo] = useState({ ...newArticulo });
-  const [errorMsg, setErrorMsg] = useState('');
-  const [visibleColumns, setVisibleColumns] = useState([
-    'id_articulo','cod_articulo','descripcion','cod_modelo','color','talle','cod_barra','tipo','familia','subfamilia','material','iibb_aplica','lista_precios_aplica'
-  ]);
-  const itemsPerPage = 25;
+  const [pageSize, setPageSize] = useState(25);
+  const [goTo, setGoTo] = useState("");
+
+  const [openCrear, setOpenCrear] = useState(false);
+  const [openEditar, setOpenEditar] = useState(false);
+  const [rowEditar, setRowEditar] = useState(null);
 
   useEffect(() => {
-    fetchData();
+    fetchArticulos();
   }, []);
 
-  const fetchData = () => {
-    api.get('/articulos')
-      .then(res => {
-        setArticulos(res.data);
-        setFiltered(res.data);
+  const fetchArticulos = () => {
+    api
+      .get("/articulos")
+      .then((res) => {
+        setArticulos(res.data || []);
+        setFiltered(res.data || []);
+        setCurrentPage(1); // reset
       })
-      .catch(err => console.error(err));
+      .catch((err) => console.error(err));
   };
 
+  // columnas: union de keys + "tipo" forzado
+  const columnas = useMemo(() => {
+    if (!articulos?.length) return [];
+    const cols = Object.keys(articulos[0] || {})
+      .filter((c) => !CAMPOS_OCULTOS.includes(String(c).toLowerCase()));
+
+    // forzar "tipo"
+    const tieneTipo = cols.some((c) => String(c).toLowerCase() === "tipo");
+    if (!tieneTipo) {
+      const idxDesc = cols.findIndex((c) => String(c).toLowerCase() === "descripcion");
+      if (idxDesc >= 0) cols.splice(idxDesc + 1, 0, "tipo");
+      else cols.push("tipo");
+    }
+
+    return cols;
+  }, [articulos]);
+
   const handleFilter = (e, key) => {
-    const value = e.target.value.toLowerCase();
+    const val = e.target.value.toLowerCase();
     setFiltered(
-      articulos.filter(a =>
-        String(a[key] || '').toLowerCase().includes(value)
-      )
+      articulos.filter((a) => String(a[key] ?? "").toLowerCase().includes(val))
     );
     setCurrentPage(1);
   };
 
-  const handleCreate = () => {
-    setErrorMsg('');
+  // ================= PAGINADO PRO (copiado de Stock) =================
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
 
-    const existe = articulos.some(a => a.cod_articulo.toLowerCase() === newArticulo.cod_articulo.toLowerCase());
-    if (existe) {
-      setErrorMsg('El código ya existe. No se puede crear el artículo.');
-      return;
-    }
+  const paginated = filtered.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
-    api.post('/articulos', newArticulo)
-      .then(() => {
-        fetchData();
-        setNewArticulo({
-          cod_articulo: '',
-          descripcion: '',
-          cod_modelo: '',
-          color: '',
-          talle: '',
-          cod_barra: '',
-          tipo: '',
-          familia: '',
-          subfamilia: '',
-          material: '',
-          iibb_aplica: '',
-          lista_precios_aplica: ''
-        });
-        setFormVisible(false);
-      })
-      .catch(err => {
-        setErrorMsg(err.response?.data?.error || 'Error al crear el artículo');
-      });
+  const clampPage = (p) => {
+    const n = Number(p);
+    if (!Number.isFinite(n)) return 1;
+    return Math.min(Math.max(1, n), totalPages);
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm("¿Estás seguro que deseas borrar este artículo?")) {
-      api.delete(`/articulos/${id}`)
-        .then(() => fetchData())
-        .catch(err => console.error(err));
-    }
+  const gotoPage = (p) => setCurrentPage(clampPage(p));
+
+  const buildPageButtons = () => {
+    const pages = [];
+    const windowSize = 2;
+
+    const start = Math.max(2, currentPage - windowSize);
+    const end = Math.min(totalPages - 1, currentPage + windowSize);
+
+    pages.push(1);
+    if (start > 2) pages.push("…");
+
+    for (let p = start; p <= end; p++) pages.push(p);
+
+    if (end < totalPages - 1) pages.push("…");
+    if (totalPages > 1) pages.push(totalPages);
+
+    return pages;
   };
 
-  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-
-  const toggleColumn = (col) => {
-    setVisibleColumns(prev =>
-      prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]
-    );
-  };
+  const pageButtons = buildPageButtons();
 
   return (
     <div className="articulos-container">
-      <h2 className="module-title">Artículos</h2>
+      <h2 className="module-title">ARTÍCULOS</h2>
 
-      <button className="nuevo-btn" onClick={() => { setFormVisible(!formVisible); setEditMode(false); }}>
-        {formVisible ? 'Cancelar' : 'Crear nuevo artículo'}
+      <button className="nuevo-btn" onClick={() => setOpenCrear(true)}>
+        Crear nuevo artículo
       </button>
 
-      <button className="nuevo-btn" onClick={() => { setEditMode(!editMode); setFormVisible(false); }}>
-        {editMode ? 'Cancelar' : 'Editar artículo'}
-      </button>
+      <ArticuloCrearModal
+        isOpen={openCrear}
+        onClose={() => setOpenCrear(false)}
+        articulos={articulos}
+        onSaved={fetchArticulos}
+      />
 
-      {formVisible && (
-        <div className="modal is-open" role="dialog" aria-modal="true">
-          <div className="modal-contenido">
-            <div className="modal-header">
-              <h3 className="modal-title">Nuevo Artículo</h3>
-              <button className="modal-close" onClick={() => setFormVisible(false)} aria-label="Cerrar">×</button>
-            </div>
+      <ArticuloEditarModal
+        isOpen={openEditar}
+        onClose={() => setOpenEditar(false)}
+        articuloRow={rowEditar}
+        articulos={articulos}
+        onSaved={fetchArticulos}
+      />
 
-            <div className="modal-body">
-              {errorMsg && <p className="error">{errorMsg}</p>}
+      <ArticuloEliminarModal
+        isOpen={openEliminar}
+        onClose={() => setOpenEliminar(false)}
+        articuloRow={rowEliminar}
+        onDeleted={fetchArticulos}
+      />
 
-              {Object.keys(newArticulo).map((key) => (
-                <input
-                  key={key}
-                  type="text"
-                  placeholder={key.replace(/_/g, ' ').toUpperCase()}
-                  value={newArticulo[key]}
-                  onChange={(e) => setNewArticulo({ ...newArticulo, [key]: e.target.value })}
-                />
+      <div className="tabla-articulos-container">
+        <table className="tabla-articulos">
+          <thead>
+            <tr>
+              {columnas.map((col) => (
+                <th key={col}>{String(col).toUpperCase()}</th>
               ))}
-            </div>
-
-            <div className="modal-footer">
-              <button className="btn-secundario" onClick={() => setFormVisible(false)}>Cancelar</button>
-              <button className="btn-primario" onClick={handleCreate}>Guardar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-      {editMode && (
-        <div className="modal is-open" role="dialog" aria-modal="true">
-          <div className="modal-contenido">
-            <div className="modal-header">
-              <h3 className="modal-title">Editar Artículo</h3>
-              <button className="modal-close" onClick={() => setEditMode(false)} aria-label="Cerrar">×</button>
-            </div>
-
-            <div className="modal-body">
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="text"
-                  placeholder="CÓDIGO A BUSCAR"
-                  value={codigoBusqueda}
-                  onChange={(e) => setCodigoBusqueda(e.target.value)}
-                />
-                <button
-                  className="btn-secundario"
-                  onClick={() => {
-                    api.get(`/articulos/codigo/${codigoBusqueda}`)
-                      .then((res) => {
-                        setEditArticulo(res.data);
-                        setEditLocked(false);
-                        setErrorMsg('');
-                      })
-                      .catch(() => {
-                        setErrorMsg('Artículo no encontrado');
-                        setEditLocked(true);
-                      });
-                  }}
-                >
-                  Buscar
-                </button>
-              </div>
-
-              {errorMsg && <p className="error">{errorMsg}</p>}
-
-              {Object.keys(editArticulo).map((key) => (
-                <input
-                  key={key}
-                  type="text"
-                  placeholder={key.replace(/_/g, ' ').toUpperCase()}
-                  value={editArticulo[key] || ''}
-                  onChange={(e) => setEditArticulo({ ...editArticulo, [key]: e.target.value })}
-                  disabled={editLocked || key === 'id_articulo'}
-                />
-              ))}
-            </div>
-
-            <div className="modal-footer">
-              <button className="btn-secundario" onClick={() => setEditMode(false)}>Cancelar</button>
-              <button
-                className="btn-primario"
-                onClick={() => {
-                  api.put(`/articulos/${editArticulo.id_articulo}`, editArticulo)
-                    .then(() => {
-                      fetchData();
-                      setEditMode(false);
-                      setEditLocked(true);
-                    })
-                    .catch((err) =>
-                      setErrorMsg(err.response?.data?.error || 'Error al editar artículo')
-                    );
-                }}
-                disabled={editLocked}
-              >
-                Guardar cambios
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-        <div className="checklist-panel">
-          {Object.keys(newArticulo).map(col => (
-            <label key={col}>
-              <input
-                type="checkbox"
-                checked={visibleColumns.includes(col) || col === 'id_articulo'}
-                onChange={() => toggleColumn(col)}
-                disabled={col === 'id_articulo'}
-              />
-              <span></span>
-              <span className="text">{col.replace(/_/g, ' ').toUpperCase()}</span>
-            </label>
-          ))}
-        </div>
-
-
-        <div className="tabla-articulos-container">
-      <table className="tabla-articulos">
-        <thead>
-          <tr>
-            {visibleColumns.includes('id_articulo') && <th>ID</th>}
-            {visibleColumns.includes('cod_articulo') && (
-              <th>
-                Código<br />
-                <input type="text" onChange={e => handleFilter(e, 'cod_articulo')} placeholder="Filtrar" />
-              </th>
-            )}
-            {visibleColumns.includes('descripcion') && (
-              <th>
-                Descripción<br />
-                <input type="text" onChange={e => handleFilter(e, 'descripcion')} placeholder="Filtrar" />
-              </th>
-            )}
-            {visibleColumns.filter(c => !['id_articulo','cod_articulo','descripcion'].includes(c)).map(col => (
-              <th key={col}>{col.replace(/_/g, ' ').toUpperCase()}</th>
-            ))}
-            <th>Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {paginated.map(a => (
-            <tr key={a.id_articulo}>
-              {visibleColumns.includes('id_articulo') && <td>{a.id_articulo}</td>}
-              {visibleColumns.includes('cod_articulo') && <td>{a.cod_articulo}</td>}
-              {visibleColumns.includes('descripcion') && <td>{a.descripcion}</td>}
-              {visibleColumns.filter(c => !['id_articulo','cod_articulo','descripcion'].includes(c)).map(col => (
-                <td key={col}>{a[col]}</td>
-              ))}
-              <td><button className="borrar-btn" onClick={() => handleDelete(a.id_articulo)}>Borrar</button></td>
+              <th>ACCIONES</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+            <tr>
+              {columnas.map((col) => (
+                <th key={col}>
+                  <input
+                    placeholder="Filtrar..."
+                    onChange={(e) => handleFilter(e, col)}
+                  />
+                </th>
+              ))}
+              <th></th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {paginated.map((a, i) => (
+              <tr key={i}>
+                {columnas.map((k) => (
+                  <td key={k}>{String(a[k] ?? "")}</td>
+                ))}
+                <td>
+                  <button
+                    className="btn-editar"
+                    onClick={() => {
+                      setRowEditar(a);
+                      setOpenEditar(true);
+                    }}
+                  >
+                    Editar
+                  </button>
+                  <button
+                    className="btn-eliminar"
+                    onClick={() => {
+                      setRowEliminar(a);
+                      setOpenEliminar(true);
+                    }}
+                    style={{ marginLeft: 8 }}
+                  >
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      <div className="paginado">
-        {Array.from({ length: totalPages }, (_, i) => (
-          <button
-            key={i}
-            className={currentPage === i + 1 ? 'activo' : ''}
-            onClick={() => setCurrentPage(i + 1)}
+      {/* ================= PAGINADO PRO (copiado de Stock) ================= */}
+      <div className="paginado-pro">
+        <div className="paginado-info">
+          Total <b>{totalItems}</b> registros
+        </div>
+
+        <div className="paginado-info">
+          Pág. <b>{currentPage}</b>/<b>{totalPages}</b>
+        </div>
+
+        <div className="paginado-size">
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setCurrentPage(1);
+            }}
           >
-            {i + 1}
+            <option value={10}>10 / pág</option>
+            <option value={25}>25 / pág</option>
+            <option value={50}>50 / pág</option>
+            <option value={100}>100 / pág</option>
+          </select>
+        </div>
+
+        <div className="paginado-goto">
+          <span>Ir a</span>
+          <input
+            value={goTo}
+            onChange={(e) => setGoTo(e.target.value.replace(/[^\d]/g, ""))}
+            onKeyDown={(e) => e.key === "Enter" && gotoPage(goTo)}
+          />
+        </div>
+
+        <div className="paginado-botones">
+          <button
+            className="pg-btn"
+            onClick={() => gotoPage(1)}
+            disabled={currentPage === 1}
+          >
+            «
           </button>
-        ))}
+          <button
+            className="pg-btn"
+            onClick={() => gotoPage(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            ‹
+          </button>
+
+          {pageButtons.map((p, idx) =>
+            p === "…" ? (
+              <span key={idx} className="pg-dots">…</span>
+            ) : (
+              <button
+                key={p}
+                className={`pg-btn ${currentPage === p ? "activo" : ""}`}
+                onClick={() => gotoPage(p)}
+              >
+                {p}
+              </button>
+            )
+          )}
+
+          <button
+            className="pg-btn"
+            onClick={() => gotoPage(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            ›
+          </button>
+          <button
+            className="pg-btn"
+            onClick={() => gotoPage(totalPages)}
+            disabled={currentPage === totalPages}
+          >
+            »
+          </button>
+        </div>
       </div>
     </div>
   );
 }
-
-export default Articulos;

@@ -12,7 +12,4 @@ router.post('/', controller.create);
 router.put('/:id', controller.update);     // <- acá antes fallaba por undefined
 router.delete('/:id', controller.remove);
 
-console.log('[depositos routes] controller keys:', Object.keys(controller));
-
-
 module.exports = router;

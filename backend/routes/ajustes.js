@@ -1,11 +1,20 @@
-// backend/routes/ajustes.js
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const controller = require('../controllers/ajustes');
+const multer = require("multer");
+const upload = multer();
 
-router.get('/', controller.getAll);
-router.get('/:id', controller.getById);    // id = numero_ajuste
-router.post('/', controller.create);
+const controller = require("../controllers/ajustes");
+const { authRequired } = require("../middleware/auth");
+
+// plantilla + import
+router.get("/plantilla", authRequired, controller.downloadTemplate);
+router.post("/importar", authRequired, upload.single("file"), controller.importarDesdeExcel);
+router.post("/consumir-produccion", authRequired, controller.consumirProduccionDropbox);
+
+// listados
+router.get("/", authRequired, controller.getAll);
+router.get("/:id", authRequired, controller.getById);
+router.post("/", authRequired, controller.create);
 
 module.exports = router;
 

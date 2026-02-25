@@ -1,4 +1,3 @@
-// db.js
 const sql = require('mssql');
 require('dotenv').config();
 
@@ -8,12 +7,12 @@ const config = {
   server: process.env.SQL_SERVER,
   database: process.env.SQL_DATABASE,
   port: Number(process.env.SQL_PORT) || 1433,
-  options: { trustServerCertificate: true }
+  options: { trustServerCertificate: true },
 };
 
 const pool = new sql.ConnectionPool(config);
 const poolConnect = pool.connect()
-  .then(() => console.log('[DB] Conectado'))
+  .then(() => console.log(`[DB] Conectado a ${config.database} en ${config.server}`))
   .catch(err => {
     console.error('[DB] Error al conectar:', err);
     throw err;
@@ -23,11 +22,13 @@ pool.on('error', err => {
   console.error('[DB] Error en pool:', err);
 });
 
-// Helper para obtener SIEMPRE un pool conectado
 async function getPool() {
   await poolConnect;
   return pool;
 }
 
 module.exports = { sql, pool, poolConnect, getPool };
+
+
+
 

@@ -1,17 +1,15 @@
-const express = require('express');
+// backend/routes/transferencias.js
+const express = require("express");
 const router = express.Router();
-const controller = require('../controllers/transferencias');
+const controller = require("../controllers/transferencias");
+const {authRequired} = require("../middleware/auth");
 
-// Listado (cabeceras)
-router.get('/', controller.getAll);
+router.get("/ubicaciones/:depositoId", authRequired, controller.getUbicacionesByDeposito);
+router.get("/articulo", authRequired, controller.getArticuloByCodigo);
 
-// Detalle por id
-router.get('/:id', controller.getById);
+router.get("/", authRequired, controller.getAll);
+router.post("/", authRequired, controller.create);
 
-// Crear transferencia (origen -> destino con items)
-router.post('/', controller.create);
+router.get("/:id", authRequired, controller.getById);
 
-module.exports = router;
-
-
-
+module.exports = router; 
