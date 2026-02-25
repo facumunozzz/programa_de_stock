@@ -21,9 +21,9 @@ function mustEnv(name) {
  *   DROPBOX_REFRESH_TOKEN
  */
 async function fetchAccessTokenFromRefresh() {
-  const APP_KEY = mustEnv("DROPBOX_APP_KEY");
-  const APP_SECRET = mustEnv("DROPBOX_APP_SECRET");
-  const REFRESH_TOKEN = mustEnv("DROPBOX_REFRESH_TOKEN");
+  const APP_KEY = mustEnv("DROPBOX_APP_KEY").trim().replace(/^"|"$/g, "");
+  const APP_SECRET = mustEnv("DROPBOX_APP_SECRET").trim().replace(/^"|"$/g, "");
+  const REFRESH_TOKEN = mustEnv("DROPBOX_REFRESH_TOKEN").trim().replace(/^"|"$/g, "");
 
   const body = new URLSearchParams();
   body.append("grant_type", "refresh_token");
