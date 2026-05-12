@@ -90,7 +90,7 @@ function TransferenciaDetalle({ transferenciaId: propId }) {
               <tr>
                 <th>
                   Código<br />
-                  <input type="text" onChange={e => handleFilter(e, 'cod_articulo')} placeholder="Filtrar" />
+                  <input type="text" onChange={e => handleFilter(e, 'codigo')} placeholder="Filtrar" />
                 </th>
                 <th>
                   Descripción<br />
@@ -107,7 +107,7 @@ function TransferenciaDetalle({ transferenciaId: propId }) {
                 <tr><td colSpan="3">Sin ítems.</td></tr>
               ) : paginated.map((item, idx) => (
                 <tr key={idx}>
-                  <td>{item.cod_articulo}</td>
+                  <td>{item.codigo}</td>
                   <td>{item.descripcion}</td>
                   <td style={{ textAlign: 'right' }}>{item.cantidad}</td>
                 </tr>

@@ -247,3 +247,194 @@ h2.module-title:hover::after {
   font-size: 11px;
   padding: 2px 4px;
 }
+
+/* =========================
+   PAGINADO PRO (estilo empresarial)
+   ========================= */
+
+.paginado-pro {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.paginado-pro .paginado-info {
+  font-size: 13px;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.paginado-pro .paginado-size select {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 13px;
+  background: #fff;
+}
+
+.paginado-pro .paginado-goto {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.paginado-pro .paginado-goto input {
+  width: 56px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 13px;
+}
+
+.paginado-pro .paginado-botones {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.paginado-pro .pg-btn {
+  min-width: 34px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.paginado-pro .pg-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.paginado-pro .pg-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.paginado-pro .pg-btn.activo {
+  border-color: #007acc;
+  background: #007acc;
+  color: #fff;
+  font-weight: 700;
+}
+
+.paginado-pro .pg-dots {
+  padding: 0 6px;
+  color: #64748b;
+}
+
+.clasif-table {
+  width: 100%;
+  margin-top: 20px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+.clasif-header,
+.clasif-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  align-items: center;
+  padding: 10px 14px;
+}
+
+.clasif-header {
+  background: #f3f6f9;
+  font-weight: 600;
+  border-bottom: 1px solid #ddd;
+}
+
+.clasif-row {
+  border-bottom: 1px solid #eee;
+}
+
+.clasif-row:last-child {
+  border-bottom: none;
+}
+
+.clasif-row:hover {
+  background: #fafafa;
+}
+
+.clasif-row .campo {
+  font-weight: 500;
+}
+
+.clasif-row input[type="checkbox"] {
+  transform: scale(1.1);
+  cursor: pointer;
+}
+
+.clasif-row button {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.btn-light.activo {
+  filter: brightness(0.95);
+  font-weight: 600;
+}
+
+.nt-subtitle {
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.nt-footer {
+  margin-top: 15px;
+  display: flex;
+  gap: 10px;
+}
+
+.nt-btn-primary {
+  background: #1e7f4f;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.nt-btn-primary:hover {
+  background: #17643f;
+}
+
+.nt-btn-secondary {
+  background: #ddd;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.nt-btn-danger {
+  background: #c0392b;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.nt-btn-danger:hover {
+  background: #a93226;
+}
+
+.nt-field.full {
+  flex: 1;
+}

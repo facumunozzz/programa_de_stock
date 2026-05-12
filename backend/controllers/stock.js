@@ -1,81 +1,216 @@
-// controllers/stock.js
-const { sql, poolConnect, getPool } = require('../db');
+// backend/controllers/stock.js
+const { sql, poolConnect, getPool } = require("../db");
 
-// Normaliza strings vacíos a NULL
-const toDb = (v) => (v == null || String(v).trim() === '' ? null : String(v).trim());
+const norm = (v) => String(v ?? "").trim().toUpperCase();
 
-/**
- * GET /stock
- * Lista el stock con artículo y depósito.
- * Filtros opcionales:
- *   - ?cod_articulo=ABC        (match exacto)
- *   - ?q=abc                   (contiene en código, descripción o depósito)
- */
-exports.getAll = async (req, res) => {
+exports.getAll = async (_req, res) => {
   try {
     await poolConnect;
     const pool = await getPool();
 
-    const cod = toDb(req.query.cod_articulo)?.toUpperCase();
-    const q   = toDb(req.query.q)?.toUpperCase();
-
-    // Base con SUM por si hubiera múltiples movimientos/filas por (artículo, depósito)
-    let query = `
-    SELECT
-      a.id_articulo,
-      a.cod_articulo,
-      ISNULL(a.descripcion,'')       AS descripcion,
-      ISNULL(a.cod_modelo,'')        AS cod_modelo,
-      ISNULL(a.color,'')             AS color,
-      ISNULL(a.talle,'')             AS talle,
-      ISNULL(a.cod_barra,'')         AS cod_barra,
-      ISNULL(a.tipo,'')              AS tipo,
-      ISNULL(a.familia,'')           AS familia,
-      ISNULL(a.subfamilia,'')        AS subfamilia,
-      ISNULL(a.material,'')          AS material,
-      ISNULL(a.iibb_aplica,'')       AS iibb_aplica,
-      ISNULL(a.lista_precios_aplica,'') AS lista_precios_aplica,
-      ISNULL(SUM(s.cantidad), 0)     AS cantidad,
-      d.nombre                       AS deposito
-    FROM stock s
-    JOIN articulos a ON a.id_articulo = s.id_articulo
-    JOIN depositos d ON d.id_deposito = s.id_deposito
-    `;
-
-    const reqDb = pool.request();
-    const where = [];
-
-    if (cod) {
-      where.push(`UPPER(LTRIM(RTRIM(a.cod_articulo))) = @cod`);
-      reqDb.input('cod', sql.VarChar, cod);
-    }
-
-    if (q) {
-      where.push(`(
-          UPPER(a.cod_articulo) LIKE '%' + @q + '%'
-       OR UPPER(a.descripcion)  LIKE '%' + @q + '%'
-       OR UPPER(d.nombre)       LIKE '%' + @q + '%'
-      )`);
-      reqDb.input('q', sql.VarChar, q);
-    }
-
-    if (where.length) {
-      query += ` WHERE ` + where.join(' AND ');
-    }
-
-    query += `
+    // 1) Base por artículo + total (SUM de dbo.stock)
+    //    (Si querés que el total salga de stock_ubicaciones, decime y lo cambiamos)
+    const baseRs = await pool.request().query(`
+      SELECT
+        a.id_articulo,
+        a.codigo,
+        a.descripcion,
+        a.folio,
+        a.proveedor,
+        a.punto_pedido,
+        a.tipo,
+        SUM(ISNULL(s.cantidad,0)) AS cantidad_total
+      FROM dbo.articulos a WITH (NOLOCK)
+      LEFT JOIN dbo.stock s WITH (NOLOCK)
+        ON s.id_articulo = a.id_articulo
       GROUP BY
-        a.id_articulo, a.cod_articulo, a.descripcion, a.cod_modelo, a.color, a.talle,
-        a.cod_barra, a.tipo, a.familia, a.subfamilia, a.material, a.iibb_aplica,
-        a.lista_precios_aplica, d.nombre
-      ORDER BY a.cod_articulo, d.nombre
-    `;
+        a.id_articulo, a.codigo, a.descripcion, a.folio, a.proveedor, a.punto_pedido, a.tipo
+      ORDER BY a.codigo;
+    `);
 
-    const result = await reqDb.query(query);
-    res.json(result.recordset);
+    const rows = baseRs.recordset || [];
+    if (!rows.length) return res.json([]);
+
+    // 2) Depósitos por artículo (cantidad + ubicaciones)
+    //    - cantidad: SUM(stock.cantidad) por depósito
+    //    - ubicaciones: DISTINCT de ubicaciones con existencia (desde stock y stock_ubicaciones)
+    const depRs = await pool.request().query(`
+    ;WITH depCant AS (
+      SELECT
+        s.id_articulo,
+        s.id_deposito,
+        ISNULL(d.nombre,'SIN ALMACEN') AS almacen,
+        SUM(ISNULL(s.cantidad,0)) AS cantidad
+      FROM dbo.stock s WITH (NOLOCK)
+      LEFT JOIN dbo.depositos d WITH (NOLOCK)
+        ON d.id_deposito = s.id_deposito
+      GROUP BY s.id_articulo, s.id_deposito, d.nombre
+    ),
+    ubis AS (
+      -- ubicaciones desde stock
+      SELECT DISTINCT
+        s.id_articulo,
+        s.id_deposito,
+        ISNULL(d.nombre,'SIN ALMACEN') AS almacen,
+        ISNULL(u.nombre,'GENERAL') AS ubicacion
+      FROM dbo.stock s WITH (NOLOCK)
+      LEFT JOIN dbo.depositos d WITH (NOLOCK)
+        ON d.id_deposito = s.id_deposito
+      LEFT JOIN dbo.ubicaciones u WITH (NOLOCK)
+        ON u.id_ubicacion = s.id_ubicacion
+
+      UNION
+
+      -- ubicaciones desde stock_ubicaciones
+      SELECT DISTINCT
+        su.id_articulo,
+        u.id_deposito,
+        d.nombre AS almacen,
+        u.nombre AS ubicacion
+      FROM dbo.stock_ubicaciones su WITH (NOLOCK)
+      INNER JOIN dbo.ubicaciones u WITH (NOLOCK)
+        ON u.id_ubicacion = su.id_ubicacion
+      INNER JOIN dbo.depositos d WITH (NOLOCK)
+        ON d.id_deposito = u.id_deposito
+    ),
+    ubAgg AS (
+      SELECT
+        x.id_articulo,
+        x.id_deposito,
+        x.almacen,
+        STUFF((
+          SELECT ' / ' + y.ubicacion
+          FROM ubis y
+          WHERE y.id_articulo = x.id_articulo
+            AND y.id_deposito = x.id_deposito
+          ORDER BY y.ubicacion
+          FOR XML PATH(''), TYPE
+        ).value('.', 'nvarchar(max)'), 1, 3, '') AS ubicaciones
+      FROM (
+        SELECT DISTINCT id_articulo, id_deposito, almacen
+        FROM ubis
+      ) x
+    )
+    SELECT
+      c.id_articulo,
+      c.id_deposito,
+      c.almacen,
+      c.cantidad,
+      ISNULL(u.ubicaciones,'') AS ubicaciones
+    FROM depCant c
+    LEFT JOIN ubAgg u
+      ON u.id_articulo = c.id_articulo
+    AND u.id_deposito = c.id_deposito
+    ORDER BY c.id_articulo, c.almacen;
+  `);
+
+    // indexamos por id_articulo => depositos[]
+    const depByArt = new Map();
+    for (const d of depRs.recordset || []) {
+      const id = Number(d.id_articulo);
+      if (!depByArt.has(id)) depByArt.set(id, []);
+      depByArt.get(id).push({
+        id_deposito: Number(d.id_deposito),
+        almacen: d.almacen,
+        cantidad: Number(d.cantidad || 0),
+        ubicaciones: String(d.ubicaciones || ""),
+      });
+    }
+
+    const out = rows.map((r) => {
+      const id = Number(r.id_articulo);
+      return {
+        codigo: r.codigo,
+        descripcion: r.descripcion,
+        folio: r.folio,
+        proveedor: r.proveedor,
+        punto_pedido: r.punto_pedido,
+        tipo: r.tipo,
+        cantidad_total: Number(r.cantidad_total || 0),
+        depositos: depByArt.get(id) || [],
+      };
+    });
+
+    res.json(out);
   } catch (err) {
-    console.error('Error en stock.getAll:', err);
-    res.status(500).json({ error: 'Error al obtener stock', detalle: err.message });
+    console.error("Error en stock.getAll:", err);
+    res.status(500).json({ error: "Error al obtener stock", detalle: err.message });
   }
 };
 
+// =====================================================
+// GET /stock/detalle (dejalo como lo tenías)
+// =====================================================
+exports.getDetalle = async (req, res) => {
+  const codigo = norm(req.query.codigo);
+  if (!codigo) return res.status(400).json({ error: "Debe indicar ?codigo=..." });
+
+  try {
+    await poolConnect;
+    const pool = await getPool();
+
+    const art = await pool
+      .request()
+      .input("codigo", sql.VarChar(80), codigo)
+      .query(`
+        SELECT TOP 1 id_articulo
+        FROM dbo.articulos WITH (NOLOCK)
+        WHERE UPPER(LTRIM(RTRIM(codigo))) = @codigo
+      `);
+
+    if (!art.recordset.length) {
+      return res.status(404).json({ error: "Artículo no encontrado", codigo });
+    }
+
+    const idArticulo = art.recordset[0].id_articulo;
+
+    const det = await pool
+      .request()
+      .input("idArt", sql.Int, idArticulo)
+      .query(`
+        ;WITH su AS (
+          SELECT
+            u.id_deposito,
+            d.nombre AS almacen,
+            u.nombre AS ubicacion,
+            SUM(su.cantidad) AS cantidad_su
+          FROM dbo.stock_ubicaciones su WITH (NOLOCK)
+          INNER JOIN dbo.ubicaciones u WITH (NOLOCK)
+            ON u.id_ubicacion = su.id_ubicacion
+          INNER JOIN dbo.depositos d WITH (NOLOCK)
+            ON d.id_deposito = u.id_deposito
+          WHERE su.id_articulo = @idArt
+          GROUP BY u.id_deposito, d.nombre, u.nombre
+        ),
+        sd AS (
+          SELECT
+            s.id_deposito,
+            ISNULL(d.nombre,'SIN ALMACEN') AS almacen,
+            ISNULL(u.nombre,'GENERAL') AS ubicacion,
+            SUM(ISNULL(s.cantidad,0)) AS cantidad_sd
+          FROM dbo.stock s WITH (NOLOCK)
+          LEFT JOIN dbo.depositos d WITH (NOLOCK)
+            ON d.id_deposito = s.id_deposito
+          LEFT JOIN dbo.ubicaciones u WITH (NOLOCK)
+            ON u.id_ubicacion = s.id_ubicacion
+          WHERE s.id_articulo = @idArt
+          GROUP BY s.id_deposito, d.nombre, u.nombre
+        )
+        SELECT
+          COALESCE(sd.id_deposito, su.id_deposito) AS id_deposito,
+          COALESCE(sd.almacen, su.almacen)         AS almacen,
+          COALESCE(sd.ubicacion, su.ubicacion)     AS ubicacion,
+          COALESCE(sd.cantidad_sd, su.cantidad_su) AS cantidad
+        FROM sd
+        FULL OUTER JOIN su
+          ON su.id_deposito = sd.id_deposito
+         AND su.ubicacion  = sd.ubicacion
+        ORDER BY almacen, ubicacion;
+      `);
+
+    res.json(det.recordset || []);
+  } catch (err) {
+    console.error("Error en stock.getDetalle:", err);
+    res.status(500).json({ error: "Error al obtener detalle de stock", detalle: err.message });
+  }
+};
