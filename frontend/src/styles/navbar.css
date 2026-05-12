@@ -87,3 +87,16 @@
     height: 36px;
   }
 }
+
+/* ejemplo de clases usadas arriba */
+.navbar-right { display:flex; align-items:center; gap:.75rem; }
+.navbar-user { font-size:.9rem; opacity:.9; }
+.navbar-logout, .navbar-login {
+  padding: .4rem .8rem;
+  border-radius: .5rem;
+  border: 1px solid rgba(0,0,0,.1);
+  background: #fff;
+  cursor: pointer;
+}
+.navbar-logout:hover, .navbar-login:hover { background:#f5f5f5; }
+.navbar-menu a.active { font-weight: 600; text-decoration: underline; }

@@ -317,3 +317,8 @@ h2.module-title:hover::after {
 .checklist-panel label span.text {
   color: #2d3748;
 }
+
+/* Marca visual para inputs obligatorios */
+.campo-obligatorio {
+  border-left: 4px solid #d32f2f !important;
+}

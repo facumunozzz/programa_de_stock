@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/axiosConfig';
+import * as XLSX from 'xlsx';                // ⬅️ agregado
 import './../styles/transferencias.css'; // reutilizo estilos de tablas
 
 function Movimientos() {
@@ -56,9 +57,34 @@ function Movimientos() {
   const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const totalPages = Math.ceil((filtered.length || 0) / itemsPerPage);
 
+  // ===== Exportar a Excel =====
+  const exportarExcel = () => {
+    // Exporta lo filtrado; si no hay filtros, exporta todo
+    const data = (filtered.length ? filtered : rows).map(r => ({
+      Fecha: r.fecha ? new Date(r.fecha).toLocaleString('es-AR') : '',
+      Código: r.codigo ?? '',
+      Descripción: r.descripcion ?? '',
+      Cantidad: r.cantidad ?? '',
+      Depósito: r.deposito ?? '',
+      Usuario: r.usuario ?? '',
+      Movimiento: r.movimiento ?? '',
+      'Num. Movimiento': r.num_movimiento ?? '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
+    XLSX.writeFile(wb, 'movimientos.xlsx');
+  };
+
   return (
     <div className="transferencias-page">
       <h2 className="module-title">Movimientos</h2>
+
+      {/* Botón Exportar */}
+      <div className="acciones" style={{ marginBottom: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button onClick={exportarExcel}>Exportar a Excel</button>
+      </div>
 
       <div className="tabla-articulos-container">
         <table className="tabla-movimientos">
@@ -165,4 +191,3 @@ function Movimientos() {
 }
 
 export default Movimientos;
-

@@ -1,24 +1,65 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext'; // 👈 Importamos el contexto
 import logoSZ from './../images/LOGO-SZCONSULTORES.png';
 import logoAquatic from './../images/logo-aquatic.png';
 import './../styles/navbar.css';
 
 function Navbar() {
+  const navigate = useNavigate();
+  const { user, isAuth, isAdmin, hasUtilidad, displayName, logout } = useAuth(); // 👈 Traemos todo desde el contexto
+
+  const linkClass = ({ isActive }) => (isActive ? 'active' : undefined);
+
   return (
     <nav className="navbar">
       <img src={logoSZ} alt="SZ Consultores" className="logo-sz" />
 
       <ul className="navbar-menu">
-        <li><NavLink to="/articulos">Artículos</NavLink></li>
-        <li><NavLink to="/produccion">Formulas de Producción</NavLink></li>
-        <li><NavLink to="/stock">Stock</NavLink></li>
-        <li><NavLink to="/transferencias">Transferencias</NavLink></li>
-        <li><NavLink to="/ajustes">Ajustes</NavLink></li>
-        <li><NavLink to="/movimientos">Movimientos</NavLink></li>
+        {hasUtilidad('Artículos') && (
+          <li><NavLink to="/articulos" className={linkClass}>Artículos</NavLink></li>
+        )}
+        {hasUtilidad('Producción') && (
+          <li><NavLink to="/produccion" className={linkClass}>Fórmulas de Producción</NavLink></li>
+        )}
+        {hasUtilidad('Fábrica') && (
+          <li><NavLink to="/fabrica" className={linkClass}>Fábrica</NavLink></li>
+        )}
+        {hasUtilidad('Stock') && (
+          <li><NavLink to="/stock" className={linkClass}>Stock</NavLink></li>
+        )}
+        {hasUtilidad('Transferencias') && (
+          <li><NavLink to="/transferencias" className={linkClass}>Transferencias</NavLink></li>
+        )}
+        {hasUtilidad('Ajustes') && (
+          <li><NavLink to="/ajustes" className={linkClass}>Altas y bajas / Ajustes</NavLink></li>
+        )}
+        {hasUtilidad('Remitos') && (
+          <li><NavLink to="/remitos" className={linkClass}>Remitos</NavLink></li>
+        )}
+        {hasUtilidad('Movimientos') && (
+          <li><NavLink to="/movimientos" className={linkClass}>Movimientos</NavLink></li>
+        )}
+        {isAdmin && (
+          <li><NavLink to="/admin" className={linkClass}>Administración</NavLink></li>
+        )}
       </ul>
 
-      <img src={logoAquatic} alt="Aquatic" className="logo-aquatic" />
+      <div className="navbar-right">
+        {isAuth ? (
+          <>
+            <span className="navbar-user">{displayName}</span>
+            <button className="navbar-logout" onClick={logout}>
+              Salir
+            </button>
+          </>
+        ) : (
+          <NavLink to="/login" className="navbar-login">
+            Iniciar sesión
+          </NavLink>
+        )}
+        <img src={logoAquatic} alt="Aquatic" className="logo-aquatic" />
+      </div>
     </nav>
   );
 }

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/transferencias');
+const { authRequired } = require("../middleware/auth");
 
 // Listado (cabeceras)
 router.get('/', controller.getAll);
@@ -9,7 +10,7 @@ router.get('/', controller.getAll);
 router.get('/:id', controller.getById);
 
 // Crear transferencia (origen -> destino con items)
-router.post('/', controller.create);
+router.post('/',authRequired, controller.create);
 
 module.exports = router;
 

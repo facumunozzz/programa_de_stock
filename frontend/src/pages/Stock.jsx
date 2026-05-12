@@ -7,8 +7,15 @@ function Stock() {
   const [stock, setStock] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+
   const [mostrarModal, setMostrarModal] = useState(false);
   const [nuevoDeposito, setNuevoDeposito] = useState('');
+
+  const [modalVerDepositos, setModalVerDepositos] = useState(false);
+  const [depositosVer, setDepositosVer] = useState([]);
+  const [depEditId, setDepEditId] = useState(null);
+  const [depEditNombre, setDepEditNombre] = useState('');
+
   const itemsPerPage = 25;
 
   useEffect(() => {
@@ -18,24 +25,34 @@ function Stock() {
   const fetchStock = () => {
     api.get('/stock')
       .then(res => {
-        setStock(res.data);
-        setFiltered(res.data);
+        setStock(res.data || []);
+        setFiltered(res.data || []);
       })
       .catch(err => console.error(err));
   };
 
   const handleFilter = (e, key) => {
     const value = e.target.value.toLowerCase();
+
     setFiltered(
       stock.filter(item =>
-        String(item[key]).toLowerCase().includes(value)
+        String(item[key] ?? '').toLowerCase().includes(value)
       )
     );
+
     setCurrentPage(1);
   };
 
-  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const paginated = filtered.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
+
+  const refreshAll = async () => {
+    fetchStock();
+  };
 
   const handleCrearDeposito = async () => {
     if (!nuevoDeposito.trim()) {
@@ -45,7 +62,8 @@ function Stock() {
 
     try {
       const res = await api.get('/depositos');
-      const existe = res.data.some(dep =>
+
+      const existe = (res.data || []).some(dep =>
         dep.nombre.trim().toLowerCase() === nuevoDeposito.trim().toLowerCase()
       );
 
@@ -55,11 +73,87 @@ function Stock() {
       }
 
       await api.post('/depositos', { nombre: nuevoDeposito.trim() });
+
       alert("Depósito creado correctamente.");
       setNuevoDeposito('');
       setMostrarModal(false);
+      await refreshAll();
     } catch (err) {
       alert("Error al crear el depósito.");
+      console.error(err);
+    }
+  };
+
+  const abrirVerDepositos = async () => {
+    try {
+      const res = await api.get('/depositos');
+      setDepositosVer(res.data || []);
+      setDepEditId(null);
+      setDepEditNombre('');
+      setModalVerDepositos(true);
+    } catch (err) {
+      alert("No se pudieron cargar los depósitos.");
+      console.error(err);
+    }
+  };
+
+  const iniciarEditarDeposito = (dep) => {
+    setDepEditId(dep.id_deposito);
+    setDepEditNombre(dep.nombre || '');
+  };
+
+  const cancelarEditarDeposito = () => {
+    setDepEditId(null);
+    setDepEditNombre('');
+  };
+
+  const guardarDeposito = async (id) => {
+    const nombre = String(depEditNombre || '').trim();
+
+    if (!nombre) {
+      alert("El nombre no puede estar vacío.");
+      return;
+    }
+
+    try {
+      await api.put(`/depositos/${id}`, { nombre });
+
+      const res = await api.get('/depositos');
+      setDepositosVer(res.data || []);
+
+      cancelarEditarDeposito();
+      await refreshAll();
+    } catch (err) {
+      if (err.response?.status === 409) {
+        alert(err.response.data?.error || "Ya existe un depósito con ese nombre.");
+        return;
+      }
+
+      alert("Error al editar depósito.");
+      console.error(err);
+    }
+  };
+
+  const eliminarDeposito = async (dep) => {
+    const ok = window.confirm(
+      `Vas a eliminar el depósito "${dep.nombre}".\n\nATENCIÓN: si este depósito tiene stock asociado, podría borrarse o fallar según la lógica del backend.\n\n¿Seguro que querés continuar?`
+    );
+
+    if (!ok) return;
+
+    try {
+      await api.delete(`/depositos/${dep.id_deposito}`, { timeout: 180000 });
+
+      const res = await api.get('/depositos');
+      setDepositosVer(res.data || []);
+
+      await refreshAll();
+    } catch (err) {
+      alert(
+        err.response?.data?.error ||
+        err.response?.data?.detalle ||
+        "Error al eliminar depósito."
+      );
       console.error(err);
     }
   };
@@ -67,6 +161,7 @@ function Stock() {
   const exportarExcel = () => {
     const ws = XLSX.utils.json_to_sheet(filtered);
     const wb = XLSX.utils.book_new();
+
     XLSX.utils.book_append_sheet(wb, ws, 'Stock');
     XLSX.writeFile(wb, 'stock.xlsx');
   };
@@ -77,6 +172,7 @@ function Stock() {
 
       <div className="acciones">
         <button onClick={() => setMostrarModal(true)}>Crear depósito</button>
+        <button onClick={abrirVerDepositos}>Ver / editar / eliminar depósitos</button>
         <button onClick={exportarExcel}>Exportar a Excel</button>
       </div>
 
@@ -84,12 +180,14 @@ function Stock() {
         <div className="modal">
           <div className="modal-content">
             <h3>Nuevo Depósito</h3>
+
             <input
               type="text"
               placeholder="Nombre del depósito"
               value={nuevoDeposito}
               onChange={e => setNuevoDeposito(e.target.value)}
             />
+
             <div className="modal-botones">
               <button onClick={handleCrearDeposito}>Crear</button>
               <button onClick={() => setMostrarModal(false)}>Cancelar</button>
@@ -98,100 +196,168 @@ function Stock() {
         </div>
       )}
 
+      {modalVerDepositos && (
+        <div className="modal">
+          <div className="modal-content modal-wide">
+            <h3>Ver depósitos</h3>
+
+            <div className="modal-scroll">
+              <table className="mini-table">
+                <tbody>
+                  {depositosVer.length === 0 ? (
+                    <tr>
+                      <td>No hay depósitos cargados.</td>
+                    </tr>
+                  ) : (
+                    depositosVer.map((dep) => (
+                      <tr key={dep.id_deposito}>
+                        <td className="mini-name">
+                          {depEditId === dep.id_deposito ? (
+                            <input
+                              value={depEditNombre}
+                              onChange={(e) => setDepEditNombre(e.target.value)}
+                              className="mini-input"
+                              autoFocus
+                            />
+                          ) : (
+                            dep.nombre
+                          )}
+                        </td>
+
+                        <td className="mini-actions">
+                          {depEditId === dep.id_deposito ? (
+                            <>
+                              <button
+                                className="btn-edit"
+                                onClick={() => guardarDeposito(dep.id_deposito)}
+                              >
+                                Guardar
+                              </button>
+
+                              <button
+                                className="btn-cancel"
+                                onClick={cancelarEditarDeposito}
+                              >
+                                Cancelar
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                className="btn-edit"
+                                onClick={() => iniciarEditarDeposito(dep)}
+                              >
+                                Editar
+                              </button>
+
+                              <button
+                                className="btn-del"
+                                onClick={() => eliminarDeposito(dep)}
+                              >
+                                Eliminar
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="modal-footer">
+              <button onClick={() => setModalVerDepositos(false)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="tabla-stock-container">
         <table className="tabla-stock">
-        <thead>
-          <tr>
-            <th>
-              Código<br />
-              <input type="text" onChange={e => handleFilter(e, 'cod_articulo')} placeholder="Filtrar" />
-            </th>
-            <th>
-              Descripción<br />
-              <input type="text" onChange={e => handleFilter(e, 'descripcion')} placeholder="Filtrar" />
-            </th>
-
-            {/* NUEVOS CAMPOS IGUAL QUE EN ARTÍCULOS */}
-            <th>
-              Cod. Modelo<br />
-              <input type="text" onChange={e => handleFilter(e, 'cod_modelo')} placeholder="Filtrar" />
-            </th>
-            <th>
-              Color<br />
-              <input type="text" onChange={e => handleFilter(e, 'color')} placeholder="Filtrar" />
-            </th>
-            <th>
-              Talle<br />
-              <input type="text" onChange={e => handleFilter(e, 'talle')} placeholder="Filtrar" />
-            </th>
-            <th>
-              Cod. Barra<br />
-              <input type="text" onChange={e => handleFilter(e, 'cod_barra')} placeholder="Filtrar" />
-            </th>
-            <th>
-              Tipo<br />
-              <input type="text" onChange={e => handleFilter(e, 'tipo')} placeholder="Filtrar" />
-            </th>
-            <th>
-              Familia<br />
-              <input type="text" onChange={e => handleFilter(e, 'familia')} placeholder="Filtrar" />
-            </th>
-            <th>
-              Subfamilia<br />
-              <input type="text" onChange={e => handleFilter(e, 'subfamilia')} placeholder="Filtrar" />
-            </th>
-            <th>
-              Material<br />
-              <input type="text" onChange={e => handleFilter(e, 'material')} placeholder="Filtrar" />
-            </th>
-            <th>
-              IIBB Aplica<br />
-              <input type="text" onChange={e => handleFilter(e, 'iibb_aplica')} placeholder="Filtrar" />
-            </th>
-            <th>
-              Lista Precios Aplica<br />
-              <input type="text" onChange={e => handleFilter(e, 'lista_precios_aplica')} placeholder="Filtrar" />
-            </th>
-
-            {/* CAMPOS PROPIOS DE STOCK */}
-            <th>
-              Cantidad<br />
-              <input type="text" onChange={e => handleFilter(e, 'cantidad')} placeholder="Filtrar" />
-            </th>
-            <th>
-              Depósito<br />
-              <input type="text" onChange={e => handleFilter(e, 'deposito')} placeholder="Filtrar" />
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {paginated.map((item, idx) => (
-            <tr key={idx}>
-              <td>{item.cod_articulo ?? ''}</td>
-              <td>{item.descripcion ?? ''}</td>
-
-              {/* NUEVOS CAMPOS */}
-              <td>{item.cod_modelo ?? ''}</td>
-              <td>{item.color ?? ''}</td>
-              <td>{item.talle ?? ''}</td>
-              <td>{item.cod_barra ?? ''}</td>
-              <td>{item.tipo ?? ''}</td>
-              <td>{item.familia ?? ''}</td>
-              <td>{item.subfamilia ?? ''}</td>
-              <td>{item.material ?? ''}</td>
-              <td>{item.iibb_aplica ?? ''}</td>
-              <td>{item.lista_precios_aplica ?? ''}</td>
-
-              {/* CAMPOS PROPIOS DE STOCK */}
-              <td>{item.cantidad ?? 0}</td>
-              <td>{item.deposito ?? ''}</td>
+          <thead>
+            <tr>
+              <th>
+                Código<br />
+                <input type="text" onChange={e => handleFilter(e, 'cod_articulo')} placeholder="Filtrar" />
+              </th>
+              <th>
+                Descripción<br />
+                <input type="text" onChange={e => handleFilter(e, 'descripcion')} placeholder="Filtrar" />
+              </th>
+              <th>
+                Cod. Modelo<br />
+                <input type="text" onChange={e => handleFilter(e, 'cod_modelo')} placeholder="Filtrar" />
+              </th>
+              <th>
+                Color<br />
+                <input type="text" onChange={e => handleFilter(e, 'color')} placeholder="Filtrar" />
+              </th>
+              <th>
+                Talle<br />
+                <input type="text" onChange={e => handleFilter(e, 'talle')} placeholder="Filtrar" />
+              </th>
+              <th>
+                Cod. Barra<br />
+                <input type="text" onChange={e => handleFilter(e, 'cod_barra')} placeholder="Filtrar" />
+              </th>
+              <th>
+                Tipo<br />
+                <input type="text" onChange={e => handleFilter(e, 'tipo')} placeholder="Filtrar" />
+              </th>
+              <th>
+                Familia<br />
+                <input type="text" onChange={e => handleFilter(e, 'familia')} placeholder="Filtrar" />
+              </th>
+              <th>
+                Subfamilia<br />
+                <input type="text" onChange={e => handleFilter(e, 'subfamilia')} placeholder="Filtrar" />
+              </th>
+              <th>
+                Material<br />
+                <input type="text" onChange={e => handleFilter(e, 'material')} placeholder="Filtrar" />
+              </th>
+              <th>
+                IIBB Aplica<br />
+                <input type="text" onChange={e => handleFilter(e, 'iibb_aplica')} placeholder="Filtrar" />
+              </th>
+              <th>
+                Lista Precios Aplica<br />
+                <input type="text" onChange={e => handleFilter(e, 'lista_precios_aplica')} placeholder="Filtrar" />
+              </th>
+              <th>
+                Cantidad<br />
+                <input type="text" onChange={e => handleFilter(e, 'cantidad')} placeholder="Filtrar" />
+              </th>
+              <th>
+                Depósito<br />
+                <input type="text" onChange={e => handleFilter(e, 'deposito')} placeholder="Filtrar" />
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      </div>
+          </thead>
 
+          <tbody>
+            {paginated.map((item, idx) => (
+              <tr key={idx}>
+                <td>{item.cod_articulo ?? ''}</td>
+                <td>{item.descripcion ?? ''}</td>
+                <td>{item.cod_modelo ?? ''}</td>
+                <td>{item.color ?? ''}</td>
+                <td>{item.talle ?? ''}</td>
+                <td>{item.cod_barra ?? ''}</td>
+                <td>{item.tipo ?? ''}</td>
+                <td>{item.familia ?? ''}</td>
+                <td>{item.subfamilia ?? ''}</td>
+                <td>{item.material ?? ''}</td>
+                <td>{item.iibb_aplica ?? ''}</td>
+                <td>{item.lista_precios_aplica ?? ''}</td>
+                <td>{item.cantidad ?? 0}</td>
+                <td>{item.deposito ?? ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div className="paginado">
         {Array.from({ length: totalPages }, (_, i) => (

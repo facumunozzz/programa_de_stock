@@ -1,0 +1,247 @@
+/* === Contenedor principal === */
+.remitos-page {
+  margin-top: 20px;
+}
+
+/* === Título === */
+.remitos-title {
+  font-family: 'Poppins', 'Segoe UI', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+  padding-bottom: 0.4rem;
+  position: relative;
+  display: inline-block;
+  background: linear-gradient(90deg, #004080, #0059b3);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+}
+
+.remitos-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0%;
+  height: 3px;
+  background: linear-gradient(90deg, #004080, #0059b3);
+  border-radius: 2px;
+  transition: width 0.4s ease-in-out;
+}
+
+.remitos-title:hover::after {
+  width: 100%;
+}
+
+/* === Acciones === */
+.remitos-actions {
+  margin-bottom: 15px;
+  display: flex;
+  gap: 10px;
+}
+
+.remitos-actions button,
+.proveedor-nuevo button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  background-color: #007acc;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.remitos-actions button:hover,
+.proveedor-nuevo button:hover {
+  background-color: #005fa3;
+}
+
+/* === Filtro === */
+.remitos-filter {
+  margin-bottom: 10px;
+}
+
+.remitos-filter input {
+  padding: 6px;
+  width: 260px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+/* === Tabla principal === */
+.remitos-table-wrap {
+  overflow-x: auto;
+  margin-top: 10px;
+}
+
+.remitos-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.remitos-table th,
+.remitos-table td {
+  border: 1px solid #ddd;
+  padding: 4px 6px;
+  text-align: left;
+  min-width: 120px;
+}
+
+.remitos-table th {
+  background: #f4f4f4;
+  font-weight: 600;
+}
+
+.remitos-table tbody tr:hover {
+  background: #eef6ff;
+}
+
+/* === Modal proveedores === */
+.remitos-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.remitos-modal-content {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 28px;
+  width: 520px;
+  max-width: 92vw;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+}
+
+.remitos-modal-content h2 {
+  margin: 0 0 22px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* === Alta rápida proveedor === */
+.proveedor-nuevo {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.proveedor-nuevo input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+/* === Tabla proveedores estilo mini-table === */
+.proveedores-scroll {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.proveedores-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 10px;
+}
+
+.proveedores-table th {
+  text-align: left;
+  font-size: 13px;
+  color: #334155;
+  padding: 4px 12px;
+}
+
+.proveedores-table td {
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.proveedores-table td:first-child {
+  border-left: 1px solid #e2e8f0;
+  border-radius: 10px 0 0 10px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.proveedores-table td:last-child {
+  border-right: 1px solid #e2e8f0;
+  border-radius: 0 10px 10px 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.proveedores-table input {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+/* === Botones proveedores === */
+.proveedores-table button {
+  border: none;
+  border-radius: 8px;
+  padding: 7px 11px;
+  margin-left: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  background: #2563eb;
+  color: white;
+}
+
+.proveedores-table button:hover {
+  background: #1d4ed8;
+}
+
+.proveedores-table button:last-child {
+  background: #dc2626;
+}
+
+.proveedores-table button:last-child:hover {
+  background: #b91c1c;
+}
+
+/* En modo edición: Guardar / Cancelar */
+.proveedores-table td button:nth-child(2) {
+  background: #64748b;
+}
+
+.proveedores-table td button:nth-child(2):hover {
+  background: #475569;
+}
+
+/* === Footer modal === */
+.remitos-modal-footer {
+  margin-top: 20px;
+  text-align: right;
+}
+
+.remitos-modal-footer button {
+  border: none;
+  border-radius: 8px;
+  padding: 9px 16px;
+  cursor: pointer;
+  background: #0f172a;
+  color: white;
+  font-weight: 600;
+}
+
+.remitos-modal-footer button:hover {
+  background: #1e293b;
+}

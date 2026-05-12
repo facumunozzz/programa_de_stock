@@ -3,7 +3,8 @@ const express = require('express');
 const router = express.Router();
 const articulos = require('../controllers/articulos');
 
-router.get('/codigo/:cod?', articulos.getArticuloByCodigo); // específico primero
+// IMPORTANTE: rutas específicas primero
+router.get("/codigo/:codigo", articulos.getByCodigo);
 router.get('/', articulos.getAllArticulos);
 router.get('/:id', articulos.getArticuloById);
 router.post('/', articulos.createArticulo);

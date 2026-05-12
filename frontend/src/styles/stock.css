@@ -165,3 +165,144 @@ h2.module-title::after {
 h2.module-title:hover::after {
   width: 100%;
 }
+
+/* =========================
+   MODAL DEPÓSITOS
+========================= */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal-content {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 28px;
+  width: 420px;
+  max-width: 92vw;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+}
+
+.modal-content h3 {
+  margin: 0 0 22px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.modal-wide {
+  width: 520px;
+}
+
+.modal-scroll {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.mini-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 10px;
+}
+
+.mini-table td {
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.mini-table td:first-child {
+  border-left: 1px solid #e2e8f0;
+  border-radius: 10px 0 0 10px;
+}
+
+.mini-table td:last-child {
+  border-right: 1px solid #e2e8f0;
+  border-radius: 0 10px 10px 0;
+}
+
+.mini-name {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.mini-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.mini-input {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.btn-edit,
+.btn-del,
+.btn-cancel {
+  border: none;
+  border-radius: 8px;
+  padding: 7px 11px;
+  margin-left: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.btn-edit {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-del {
+  background: #dc2626;
+  color: white;
+}
+
+.btn-cancel {
+  background: #64748b;
+  color: white;
+}
+
+.btn-edit:hover {
+  background: #1d4ed8;
+}
+
+.btn-del:hover {
+  background: #b91c1c;
+}
+
+.btn-cancel:hover {
+  background: #475569;
+}
+
+.modal-footer {
+  margin-top: 20px;
+  text-align: right;
+}
+
+.modal-footer button,
+.modal-botones button {
+  border: none;
+  border-radius: 8px;
+  padding: 9px 16px;
+  cursor: pointer;
+  background: #0f172a;
+  color: white;
+  font-weight: 600;
+}
+
+.modal-footer button:hover,
+.modal-botones button:hover {
+  background: #1e293b;
+}

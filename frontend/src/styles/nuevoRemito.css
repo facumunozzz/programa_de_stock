@@ -1,0 +1,253 @@
+.nuevo-remito-page {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f6f7f9;
+  min-height: 100vh;
+}
+
+.remito-print-area {
+  background: #fff;
+  padding: 22px;
+  border-radius: 14px;
+  border: 1px solid #d9e2ec;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.nuevo-remito-titulo {
+  text-align: center;
+  margin: 0 0 18px;
+  font-family: 'Poppins', 'Segoe UI', sans-serif;
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #004080, #0059b3);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.remito-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.remito-label {
+  color: #9a6a00;
+  margin: 0 0 20px;
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.remito-fecha {
+  font-size: 13px;
+  color: #111827;
+}
+
+.remito-logo {
+  text-align: center;
+}
+
+.remito-logo img {
+  max-height: 72px;
+  max-width: 180px;
+  object-fit: contain;
+}
+
+.remito-numero {
+  border: 2px solid #111827;
+  text-align: center;
+  padding: 10px 16px;
+  font-weight: 800;
+  max-width: 220px;
+  justify-self: center;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.remito-botones {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.remito-botones button,
+.material-line button {
+  background: #007acc;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 13px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.remito-botones button:hover,
+.material-line button:hover {
+  background: #005fa3;
+}
+
+.remito-botones .danger {
+  background: #dc2626;
+}
+
+.remito-botones .danger:hover {
+  background: #b91c1c;
+}
+
+.remito-error {
+  background: #ffe5e5;
+  border: 1px solid #dc2626;
+  color: #991b1b;
+  padding: 9px;
+  margin-bottom: 12px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.remito-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.remito-campo {
+  background: #f8fafc;
+  border: 1px solid #d9e2ec;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.remito-campo label {
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.remito-campo input,
+.remito-campo select {
+  width: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: white;
+}
+
+.remito-campo.material {
+  grid-column: 1 / 2;
+}
+
+.remito-campo.tipo {
+  grid-column: 1 / 3;
+  text-align: center;
+}
+
+.material-line {
+  display: flex;
+  gap: 8px;
+}
+
+.material-line input {
+  flex: 1;
+}
+
+.switch-remito {
+  display: inline-block;
+  min-width: 180px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: none;
+  color: white;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.switch-remito.ingreso {
+  background: #16a34a;
+}
+
+.switch-remito.egreso {
+  background: #dc2626;
+}
+
+.remito-detalle-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+  background: white;
+}
+
+.remito-detalle-table th,
+.remito-detalle-table td {
+  border: 1px solid #d1d5db;
+  padding: 6px;
+}
+
+.remito-detalle-table th {
+  background: #0f172a;
+  color: white;
+  font-weight: 700;
+}
+
+.remito-detalle-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.remito-detalle-table tbody tr:hover {
+  background: #eaf4ff;
+}
+
+.remito-detalle-table input,
+.remito-detalle-table select {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  padding: 5px;
+  box-sizing: border-box;
+}
+
+.remito-detalle-table button {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 6px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .remito-print-area,
+  .remito-print-area * {
+    visibility: visible;
+  }
+
+  .remito-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: none;
+    box-shadow: none;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+
+.remito-logo img {
+  filter: invert(1);
+}
