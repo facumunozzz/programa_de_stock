@@ -256,6 +256,11 @@ exports.create = async (req, res) => {
 // ========================================================
 // ARTÍCULOS CON FÓRMULA PARA REMITOS
 // ========================================================
+// ========================================================
+// ARTÍCULOS CON FÓRMULA PARA REMITOS
+// Por defecto aparecen ACTIVOS.
+// Si fueron desactivados, conserva el estado inactivo.
+// ========================================================
 exports.getArticulosConFormula = async (_req, res) => {
   try {
     await poolConnect;
@@ -265,24 +270,37 @@ exports.getArticulosConFormula = async (_req, res) => {
       SELECT
         a.id_articulo,
         a.cod_articulo,
+        a.cod_barra,
         a.descripcion,
-        CASE 
-          WHEN ra.id_articulo IS NULL THEN CAST(0 AS BIT)
-          ELSE ra.activo
+
+        CASE
+          WHEN ra.id_articulo IS NULL THEN CAST(1 AS BIT)
+          ELSE ISNULL(ra.activo, 1)
         END AS activo
+
       FROM dbo.articulos a
+
       INNER JOIN dbo.produccion_formulas f
         ON f.producto_id = a.id_articulo
+
       LEFT JOIN dbo.remito_articulos ra
         ON ra.id_articulo = a.id_articulo
-      ORDER BY a.cod_articulo
+
+      ORDER BY
+        a.descripcion,
+        a.cod_articulo
     `);
 
-    res.json(r.recordset || []);
+    return res.json(r.recordset || []);
   } catch (err) {
-    console.error("remitos.getArticulosConFormula:", err);
-    res.status(500).json({
-      error: "Error al listar artículos con fórmula",
+    console.error(
+      "remitos.getArticulosConFormula:",
+      err
+    );
+
+    return res.status(500).json({
+      error:
+        "Error al listar artículos con fórmula",
       detalle: err.message,
     });
   }
@@ -290,6 +308,11 @@ exports.getArticulosConFormula = async (_req, res) => {
 
 // ========================================================
 // SOLO ARTÍCULOS ACTIVOS PARA USAR EN REMITOS
+// ========================================================
+// ========================================================
+// SOLO ARTÍCULOS ACTIVOS PARA USAR EN REMITOS
+// Los artículos sin configuración previa se consideran activos.
+// Los desactivados expresamente quedan excluidos.
 // ========================================================
 exports.getArticulosActivos = async (_req, res) => {
   try {
@@ -300,21 +323,34 @@ exports.getArticulosActivos = async (_req, res) => {
       SELECT
         a.id_articulo,
         a.cod_articulo,
+        a.cod_barra,
         a.descripcion
-      FROM dbo.remito_articulos ra
-      INNER JOIN dbo.articulos a
-        ON a.id_articulo = ra.id_articulo
+
+      FROM dbo.articulos a
+
       INNER JOIN dbo.produccion_formulas f
         ON f.producto_id = a.id_articulo
-      WHERE ra.activo = 1
-      ORDER BY a.cod_articulo
+
+      LEFT JOIN dbo.remito_articulos ra
+        ON ra.id_articulo = a.id_articulo
+
+      WHERE ISNULL(ra.activo, 1) = 1
+
+      ORDER BY
+        a.descripcion,
+        a.cod_articulo
     `);
 
-    res.json(r.recordset || []);
+    return res.json(r.recordset || []);
   } catch (err) {
-    console.error("remitos.getArticulosActivos:", err);
-    res.status(500).json({
-      error: "Error al listar artículos activos para remitos",
+    console.error(
+      "remitos.getArticulosActivos:",
+      err
+    );
+
+    return res.status(500).json({
+      error:
+        "Error al listar artículos activos para remitos",
       detalle: err.message,
     });
   }

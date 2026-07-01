@@ -1,175 +1,391 @@
 import React, { useEffect, useMemo, useState } from "react";
+
 import { useNavigate } from "react-router-dom";
+
 import api from "../api/axiosConfig";
+
 import "./../styles/transferencias.css";
+
+function useDebounce(value, delay = 350) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 export default function CrearFormula() {
   const navigate = useNavigate();
 
-  const [codigo, setCodigo] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [verificado, setVerificado] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  /*
+  |--------------------------------------------------------------------------
+  | Producto
+  |--------------------------------------------------------------------------
+  */
 
-  const [matCodigo, setMatCodigo] = useState("");
-  const [matDescripcion, setMatDescripcion] = useState("");
-  const [matCantidad, setMatCantidad] = useState("");
+  const [busquedaProducto, setBusquedaProducto] = useState("");
+
+  const [codBarraProducto, setCodBarraProducto] = useState("");
+
+  const [descripcionProducto, setDescripcionProducto] = useState("");
+
+  const [productoVerificado, setProductoVerificado] = useState(false);
+
+  const [verificandoProducto, setVerificandoProducto] = useState(false);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Material
+  |--------------------------------------------------------------------------
+  */
+
+  const [busquedaMaterial, setBusquedaMaterial] = useState("");
+
+  const [codBarraMaterial, setCodBarraMaterial] = useState("");
+
+  const [descripcionMaterial, setDescripcionMaterial] = useState("");
+
+  const [cantidadMaterial, setCantidadMaterial] = useState("");
+
+  const [buscandoMaterial, setBuscandoMaterial] = useState(false);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Fórmula
+  |--------------------------------------------------------------------------
+  */
 
   const [items, setItems] = useState([]);
 
-  const normalizarNumero = (valor) => {
-    return String(valor ?? "").replace(",", ".");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const [guardando, setGuardando] = useState(false);
+
+  const busquedaMaterialDebounced = useDebounce(busquedaMaterial, 400);
+
+  const normalizarNumero = (value) => {
+    return String(value ?? "").replace(",", ".");
   };
 
-  const permitirDecimalPositivo = (valor) => {
-    const v = String(valor ?? "").replace(",", ".");
-    if (/^\d*\.?\d*$/.test(v)) {
-      setMatCantidad(v);
+  const permitirDecimalPositivo = (value) => {
+    const normalized = normalizarNumero(value);
+
+    if (/^\d*\.?\d*$/.test(normalized)) {
+      setCantidadMaterial(normalized);
     }
   };
 
-  function useDebounce(value, delay = 300) {
-    const [debounced, setDebounced] = useState(value);
+  const limpiarProducto = () => {
+    setCodBarraProducto("");
+    setDescripcionProducto("");
+    setProductoVerificado(false);
+  };
 
-    useEffect(() => {
-      const t = setTimeout(() => setDebounced(value), delay);
-      return () => clearTimeout(t);
-    }, [value, delay]);
+  const limpiarMaterial = () => {
+    setBusquedaMaterial("");
+    setCodBarraMaterial("");
+    setDescripcionMaterial("");
+    setCantidadMaterial("");
+  };
 
-    return debounced;
-  }
-
-  const debouncedMatCodigo = useDebounce(matCodigo, 250);
+  /*
+  |--------------------------------------------------------------------------
+  | Buscar automáticamente el material
+  |--------------------------------------------------------------------------
+  */
 
   useEffect(() => {
-    const c = (debouncedMatCodigo || "").trim();
+    const referencia = busquedaMaterialDebounced.trim();
 
-    if (!c) {
-      setMatDescripcion("");
+    if (!referencia) {
+      setCodBarraMaterial("");
+      setDescripcionMaterial("");
+      setBuscandoMaterial(false);
       return;
     }
 
-    let cancel = false;
+    let cancelado = false;
 
-    (async () => {
+    const buscarMaterial = async () => {
       try {
-        const res = await api.get(`/articulos/codigo/${encodeURIComponent(c)}`);
-        if (!cancel) setMatDescripcion(res.data?.descripcion || "");
+        setBuscandoMaterial(true);
+
+        const response = await api.get(
+          `/articulos/referencia/${encodeURIComponent(referencia)}`,
+        );
+
+        if (cancelado) return;
+
+        const articulo = response.data || {};
+
+        setCodBarraMaterial(articulo.cod_barra || "");
+
+        setDescripcionMaterial(articulo.descripcion || "");
       } catch {
-        if (!cancel) setMatDescripcion("");
+        if (cancelado) return;
+
+        setCodBarraMaterial("");
+        setDescripcionMaterial("");
+      } finally {
+        if (!cancelado) {
+          setBuscandoMaterial(false);
+        }
       }
-    })();
+    };
+
+    buscarMaterial();
 
     return () => {
-      cancel = true;
+      cancelado = true;
     };
-  }, [debouncedMatCodigo]);
+  }, [busquedaMaterialDebounced]);
 
-  const verificarCodigo = async () => {
+  /*
+  |--------------------------------------------------------------------------
+  | Verificar producto
+  |--------------------------------------------------------------------------
+  */
+
+  const verificarProducto = async () => {
     setErrorMsg("");
 
-    const c = (codigo || "").trim().toUpperCase();
-    if (!c) return setErrorMsg("Ingresá un código para verificar.");
+    const referencia = busquedaProducto.trim();
+
+    if (!referencia) {
+      return setErrorMsg("Ingresá un código de barras o una descripción.");
+    }
 
     try {
-      const res = await api.get(`/articulos/codigo/${encodeURIComponent(c)}`);
-      setCodigo(c);
-      setDescripcion(res.data?.descripcion || "");
-      setVerificado(true);
-    } catch {
-      const ir = window.confirm(
-        "El código NO existe. ¿Querés ir a Artículos para crearlo?"
+      setVerificandoProducto(true);
+
+      const response = await api.get(
+        `/articulos/referencia/${encodeURIComponent(referencia)}`,
       );
-      if (ir) navigate("/articulos");
+
+      const articulo = response.data || {};
+
+      if (!articulo.cod_barra) {
+        limpiarProducto();
+
+        return setErrorMsg("El artículo encontrado no tiene código de barras.");
+      }
+
+      setCodBarraProducto(String(articulo.cod_barra));
+
+      setDescripcionProducto(articulo.descripcion || "");
+
+      setBusquedaProducto(articulo.descripcion || articulo.cod_barra);
+
+      setProductoVerificado(true);
+    } catch (error) {
+      limpiarProducto();
+
+      const mensaje =
+        error.response?.data?.error ||
+        error.response?.data?.detalle ||
+        "No se encontró el producto.";
+
+      setErrorMsg(mensaje);
+    } finally {
+      setVerificandoProducto(false);
     }
   };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Agregar material
+  |--------------------------------------------------------------------------
+  */
 
   const agregarItem = () => {
     setErrorMsg("");
 
-    const cod = (matCodigo || "").trim().toUpperCase();
-    const cant = Number(normalizarNumero(matCantidad));
+    const codBarra = codBarraMaterial.trim().toUpperCase();
 
-    if (!cod) return setErrorMsg("Ingresá el código del material.");
-    if (!Number.isFinite(cant) || cant <= 0) {
-      return setErrorMsg("La cantidad debe ser mayor que 0. Puede ser decimal.");
+    const cantidad = Number(normalizarNumero(cantidadMaterial));
+
+    if (!busquedaMaterial.trim()) {
+      return setErrorMsg(
+        "Ingresá el código de barras o la descripción del material.",
+      );
     }
 
-    setItems((prev) => {
-      const ix = prev.findIndex((it) => it.cod_articulo === cod);
+    if (!codBarra) {
+      return setErrorMsg(
+        "El material ingresado no fue encontrado o no tiene código de barras.",
+      );
+    }
 
-      if (ix === -1) {
+    if (!descripcionMaterial) {
+      return setErrorMsg("No se pudo identificar la descripción del material.");
+    }
+
+    if (!Number.isFinite(cantidad) || cantidad <= 0) {
+      return setErrorMsg("La cantidad debe ser mayor que 0.");
+    }
+
+    if (codBarra === codBarraProducto.trim().toUpperCase()) {
+      return setErrorMsg(
+        "El producto no puede agregarse como material de su propia fórmula.",
+      );
+    }
+
+    setItems((previousItems) => {
+      const existingIndex = previousItems.findIndex(
+        (item) => item.cod_barra === codBarra,
+      );
+
+      if (existingIndex === -1) {
         return [
-          ...prev,
+          ...previousItems,
           {
-            cod_articulo: cod,
-            descripcion: matDescripcion || "",
-            cantidad: cant,
+            cod_barra: codBarra,
+            descripcion: descripcionMaterial,
+            cantidad,
           },
         ];
       }
 
-      const copy = [...prev];
-      copy[ix] = {
-        ...copy[ix],
-        cantidad: Number(copy[ix].cantidad) + cant,
+      const updatedItems = [...previousItems];
+
+      updatedItems[existingIndex] = {
+        ...updatedItems[existingIndex],
+        cantidad: Number(updatedItems[existingIndex].cantidad) + cantidad,
       };
-      return copy;
+
+      return updatedItems;
     });
 
-    setMatCodigo("");
-    setMatDescripcion("");
-    setMatCantidad("");
+    limpiarMaterial();
   };
 
-  const quitarItem = (idx) => {
-    setItems((prev) => prev.filter((_, i) => i !== idx));
+  /*
+  |--------------------------------------------------------------------------
+  | Quitar material
+  |--------------------------------------------------------------------------
+  */
+
+  const quitarItem = (index) => {
+    setItems((previousItems) =>
+      previousItems.filter((_, itemIndex) => itemIndex !== index),
+    );
   };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Crear fórmula
+  |--------------------------------------------------------------------------
+  */
 
   const confirmar = async () => {
+    setErrorMsg("");
+
+    if (!productoVerificado || !codBarraProducto) {
+      return setErrorMsg("Primero verificá el producto.");
+    }
+
+    if (!items.length) {
+      return setErrorMsg(
+        'Agregá al menos un material con "Cargar y continuar".',
+      );
+    }
+
+    const itemsNormalizados = items.map((item) => ({
+      cod_barra: item.cod_barra,
+      cantidad: Number(normalizarNumero(item.cantidad)),
+    }));
+
+    const tieneCantidadInvalida = itemsNormalizados.some(
+      (item) => !Number.isFinite(item.cantidad) || item.cantidad <= 0,
+    );
+
+    if (tieneCantidadInvalida) {
+      return setErrorMsg("Todas las cantidades deben ser mayores que 0.");
+    }
+
     try {
-      setErrorMsg("");
+      setGuardando(true);
 
-      const c = (codigo || "").trim().toUpperCase();
+      const response = await api.post("/produccion/formulas", {
+        cod_barra: codBarraProducto,
+        items: itemsNormalizados,
+      });
 
-      if (!verificado) return setErrorMsg("Primero verificá que el código exista.");
-      if (!c) return setErrorMsg("Código inválido.");
-      if (items.length === 0) {
-        return setErrorMsg('Agregá materiales con "Cargar y continuar".');
+      alert(response.data?.message || "Fórmula creada correctamente.");
+
+      navigate("/produccion");
+    } catch (error) {
+      const detalle = error.response?.data?.detalle;
+
+      let mensaje =
+        error.response?.data?.error ||
+        error.message ||
+        "Error al crear la fórmula.";
+
+      if (Array.isArray(detalle)) {
+        mensaje += `: ${detalle.join(", ")}`;
+      } else if (detalle && typeof detalle === "string") {
+        mensaje += `: ${detalle}`;
       }
 
-      const body = {
-        codigo: c,
-        items: items.map((it) => ({
-          cod_articulo: String(it.cod_articulo || "").trim().toUpperCase(),
-          cantidad: Number(it.cantidad),
-        })),
-      };
-
-      const res = await api.post("/produccion/formulas", body);
-
-      alert(res.data?.message || "Fórmula creada correctamente.");
-      navigate("/produccion");
-    } catch (err) {
-      const msg =
-        err.response?.data?.error ||
-        err.response?.data?.detalle ||
-        err.message ||
-        "Error al crear la fórmula";
-      setErrorMsg(msg);
+      setErrorMsg(mensaje);
+    } finally {
+      setGuardando(false);
     }
   };
 
+  /*
+  |--------------------------------------------------------------------------
+  | Estado de botones
+  |--------------------------------------------------------------------------
+  */
+
+  const puedeAgregarMaterial = useMemo(() => {
+    const cantidad = Number(normalizarNumero(cantidadMaterial));
+
+    return (
+      productoVerificado &&
+      Boolean(codBarraMaterial) &&
+      Boolean(descripcionMaterial) &&
+      Number.isFinite(cantidad) &&
+      cantidad > 0 &&
+      !buscandoMaterial
+    );
+  }, [
+    productoVerificado,
+    codBarraMaterial,
+    descripcionMaterial,
+    cantidadMaterial,
+    buscandoMaterial,
+  ]);
+
   const puedeConfirmar = useMemo(
-    () => verificado && codigo.trim() && items.length > 0,
-    [verificado, codigo, items.length]
+    () =>
+      productoVerificado &&
+      Boolean(codBarraProducto) &&
+      items.length > 0 &&
+      !guardando,
+    [productoVerificado, codBarraProducto, items.length, guardando],
   );
 
   return (
     <div className="nueva-transferencia-page">
       <div className="nt-header">
         <h2 className="module-title">Crear fórmula</h2>
-        <button className="nt-volver" onClick={() => navigate("/produccion")}>
+
+        <button
+          type="button"
+          className="nt-volver"
+          onClick={() => navigate("/produccion")}
+        >
           ← Volver
         </button>
       </div>
@@ -177,87 +393,140 @@ export default function CrearFormula() {
       {errorMsg && <div className="nt-error">{errorMsg}</div>}
 
       <div className="nt-card">
+        <h4>Producto</h4>
+
         <div className="nt-row">
           <div className="nt-field">
-            <label>Código (producto)</label>
+            <label>Código de barras o descripción</label>
+
             <input
               type="text"
-              placeholder="Código del producto…"
-              value={codigo}
-              onChange={(e) => {
-                setCodigo(e.target.value);
-                setVerificado(false);
-                setDescripcion("");
+              placeholder="Escanee el código o escriba la descripción…"
+              value={busquedaProducto}
+              onChange={(event) => {
+                setBusquedaProducto(event.target.value);
+
+                limpiarProducto();
+                setItems([]);
+                setErrorMsg("");
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  verificarProducto();
+                }
               }}
             />
           </div>
 
           <div className="nt-field">
-            <label>Descripción</label>
+            <label>Código de barras</label>
+
             <input
               type="text"
-              value={descripcion}
+              value={codBarraProducto}
+              readOnly
+              placeholder="Se completa al verificar"
+            />
+          </div>
+
+          <div className="nt-field">
+            <label>Descripción</label>
+
+            <input
+              type="text"
+              value={descripcionProducto}
               readOnly
               placeholder="Se completa al verificar"
             />
           </div>
 
           <div className="nt-actions">
-            <button className="btn-light" onClick={verificarCodigo}>
-              Verificar
+            <button
+              type="button"
+              className="btn-light"
+              onClick={verificarProducto}
+              disabled={verificandoProducto}
+            >
+              {verificandoProducto ? "Verificando…" : "Verificar"}
             </button>
           </div>
         </div>
       </div>
 
-      {verificado && (
+      {productoVerificado && (
         <>
           <div className="nt-card">
             <h4>Materiales</h4>
 
             <div className="nt-row">
               <div className="nt-field">
-                <label>Ingrese un material (código)</label>
+                <label>Código de barras o descripción</label>
+
                 <input
                   type="text"
-                  placeholder="Código material…"
-                  value={matCodigo}
-                  onChange={(e) => setMatCodigo(e.target.value)}
+                  placeholder="Escanee o escriba la descripción…"
+                  value={busquedaMaterial}
+                  onChange={(event) => {
+                    setBusquedaMaterial(event.target.value);
+
+                    setCodBarraMaterial("");
+
+                    setDescripcionMaterial("");
+
+                    setErrorMsg("");
+                  }}
+                />
+              </div>
+
+              <div className="nt-field">
+                <label>Código de barras</label>
+
+                <input
+                  type="text"
+                  value={codBarraMaterial}
+                  readOnly
+                  placeholder={
+                    buscandoMaterial
+                      ? "Buscando…"
+                      : "Se completa automáticamente"
+                  }
                 />
               </div>
 
               <div className="nt-field">
                 <label>Descripción</label>
-                <input
-                  type="text"
-                  value={matDescripcion}
-                  readOnly
-                  placeholder="Se completa desde el código"
+
+                <input type="text" value={descripcionMaterial} readOnlyplaceholder={
+                    buscandoMaterial
+                      ? "Buscando…"
+                      : "Se completa automáticamente"}
                 />
               </div>
 
               <div className="nt-field small">
                 <label>Cantidad</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={matCantidad}
-                  placeholder="Ej: 0.25"
-                  onChange={(e) => permitirDecimalPositivo(e.target.value)}
+
+                <input type="text" inputMode="decimal" placeholder="Ej: 0.25" value={cantidadMaterial}
+                  onChange={(event) =>
+                    permitirDecimalPositivo(event.target.value)
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && puedeAgregarMaterial) {
+                      event.preventDefault();
+                      agregarItem();
+                    }
+                  }}
                 />
               </div>
 
               <div className="nt-actions">
-                <button className="btn-light" onClick={agregarItem}>
+                <button type="button" className="btn-light" onClick={agregarItem} disabled={!puedeAgregarMaterial}>
                   Cargar y continuar
                 </button>
 
-                <button
-                  className="btn-primary"
-                  onClick={confirmar}
-                  disabled={!puedeConfirmar}
-                >
-                  Confirmar
+                <button type="button" className="btn-primary" onClick={confirmar} disabled={!puedeConfirmar}>
+                  {guardando ? "Guardando…" : "Confirmar"}
                 </button>
               </div>
             </div>
@@ -270,9 +539,11 @@ export default function CrearFormula() {
               <table className="tabla-articulos">
                 <thead>
                   <tr>
-                    <th>Código</th>
+                    <th>Código de barras</th>
                     <th>Descripción</th>
-                    <th style={{ textAlign: "right" }}>Cantidad</th>
+                    <th style={{textAlign: "right"}}>
+                      Cantidad
+                    </th>
                     <th>Acción</th>
                   </tr>
                 </thead>
@@ -280,21 +551,20 @@ export default function CrearFormula() {
                 <tbody>
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan="4">
-                        No hay materiales. Usá "Cargar y continuar".
+                      <td colSpan={4}>
+                        No hay materiales cargados. Usá “Cargar y continuar”.
                       </td>
                     </tr>
                   ) : (
-                    items.map((it, idx) => (
-                      <tr key={idx}>
-                        <td>{it.cod_articulo}</td>
-                        <td>{it.descripcion}</td>
-                        <td style={{ textAlign: "right" }}>{it.cantidad}</td>
+                    items.map((item, index) => (
+                      <tr key={item.cod_barra}>
+                        <td>{item.cod_barra}</td>
+                        <td>{item.descripcion}</td>
+                        <td style={{textAlign: "right"}}>
+                          {item.cantidad}
+                        </td>
                         <td>
-                          <button
-                            className="borrar-btn"
-                            onClick={() => quitarItem(idx)}
-                          >
+                          <button type="button" className="borrar-btn" onClick={() => quitarItem(index)}>
                             Quitar
                           </button>
                         </td>

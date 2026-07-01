@@ -1,229 +1,475 @@
 import React, { useEffect, useMemo, useState } from "react";
+
 import { useNavigate } from "react-router-dom";
+
 import api from "../api/axiosConfig";
+
 import "./../styles/transferencias.css";
+
+function useDebounce(value, delay = 350) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 export default function EditarFormula() {
   const navigate = useNavigate();
 
-  const [codigo, setCodigo] = useState("");
-  const [descripcion, setDescripcion] = useState("");
+  /*
+  |--------------------------------------------------------------------------
+  | Producto
+  |--------------------------------------------------------------------------
+  */
 
-  const [cargando, setCargando] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [busquedaProducto, setBusquedaProducto] = useState("");
+
+  const [codBarraProducto, setCodBarraProducto] = useState("");
+
+  const [descripcionProducto, setDescripcionProducto] = useState("");
+
+  const [formulaCargada, setFormulaCargada] = useState(false);
+
+  const [buscandoFormula, setBuscandoFormula] = useState(false);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Material
+  |--------------------------------------------------------------------------
+  */
+
+  const [busquedaMaterial, setBusquedaMaterial] = useState("");
+
+  const [codBarraMaterial, setCodBarraMaterial] = useState("");
+
+  const [descripcionMaterial, setDescripcionMaterial] = useState("");
+
+  const [cantidadMaterial, setCantidadMaterial] = useState("");
+
+  const [buscandoMaterial, setBuscandoMaterial] = useState(false);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Fórmula
+  |--------------------------------------------------------------------------
+  */
 
   const [items, setItems] = useState([]);
 
-  const [matCodigo, setMatCodigo] = useState("");
-  const [matDescripcion, setMatDescripcion] = useState("");
-  const [matCantidad, setMatCantidad] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const normalizarNumero = (valor) => {
-    return String(valor ?? "").replace(",", ".");
+  const [guardando, setGuardando] = useState(false);
+
+  const busquedaMaterialDebounced = useDebounce(busquedaMaterial, 400);
+
+  const normalizarNumero = (value) => {
+    return String(value ?? "").replace(",", ".");
   };
 
-  const permitirDecimalPositivo = (valor, setter) => {
-    const v = String(valor ?? "").replace(",", ".");
-    if (/^\d*\.?\d*$/.test(v)) {
-      setter(v);
+  const permitirDecimalPositivo = (value, setter) => {
+    const normalized = normalizarNumero(value);
+
+    if (/^\d*\.?\d*$/.test(normalized)) {
+      setter(normalized);
     }
   };
 
-  function useDebounce(value, delay = 300) {
-    const [debounced, setDebounced] = useState(value);
+  const limpiarFormula = () => {
+    setCodBarraProducto("");
+    setDescripcionProducto("");
+    setFormulaCargada(false);
+    setItems([]);
+  };
 
-    useEffect(() => {
-      const t = setTimeout(() => setDebounced(value), delay);
-      return () => clearTimeout(t);
-    }, [value, delay]);
+  const limpiarMaterial = () => {
+    setBusquedaMaterial("");
+    setCodBarraMaterial("");
+    setDescripcionMaterial("");
+    setCantidadMaterial("");
+  };
 
-    return debounced;
-  }
-
-  const debouncedMatCodigo = useDebounce(matCodigo, 250);
+  /*
+  |--------------------------------------------------------------------------
+  | Buscar automáticamente material
+  |--------------------------------------------------------------------------
+  */
 
   useEffect(() => {
-    const c = (debouncedMatCodigo || "").trim();
+    const referencia = busquedaMaterialDebounced.trim();
 
-    if (!c) {
-      setMatDescripcion("");
+    if (!referencia) {
+      setCodBarraMaterial("");
+      setDescripcionMaterial("");
+      setBuscandoMaterial(false);
       return;
     }
 
-    let cancel = false;
+    let cancelado = false;
 
-    (async () => {
+    const buscarMaterial = async () => {
       try {
-        const res = await api.get(`/articulos/codigo/${encodeURIComponent(c)}`);
-        if (!cancel) setMatDescripcion(res.data?.descripcion || "");
+        setBuscandoMaterial(true);
+
+        const response = await api.get(
+          `/articulos/referencia/${encodeURIComponent(referencia)}`,
+        );
+
+        if (cancelado) return;
+
+        const articulo = response.data || {};
+
+        setCodBarraMaterial(articulo.cod_barra || "");
+
+        setDescripcionMaterial(articulo.descripcion || "");
       } catch {
-        if (!cancel) setMatDescripcion("");
+        if (cancelado) return;
+
+        setCodBarraMaterial("");
+        setDescripcionMaterial("");
+      } finally {
+        if (!cancelado) {
+          setBuscandoMaterial(false);
+        }
       }
-    })();
+    };
+
+    buscarMaterial();
 
     return () => {
-      cancel = true;
+      cancelado = true;
     };
-  }, [debouncedMatCodigo]);
+  }, [busquedaMaterialDebounced]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Buscar producto y fórmula
+  |--------------------------------------------------------------------------
+  */
 
   const buscarFormula = async () => {
     setErrorMsg("");
-    setItems([]);
-    setDescripcion("");
+    limpiarFormula();
 
-    const c = (codigo || "").trim().toUpperCase();
-    if (!c) return setErrorMsg("Ingresá un código de producto.");
+    const referencia = busquedaProducto.trim();
+
+    if (!referencia) {
+      return setErrorMsg("Ingresá un código de barras o una descripción.");
+    }
 
     try {
-      setCargando(true);
+      setBuscandoFormula(true);
 
-      const res = await api.get(`/produccion/formulas/${encodeURIComponent(c)}`);
+      /*
+      |--------------------------------------------------------------------------
+      | Resolver producto por código de barras o descripción
+      |--------------------------------------------------------------------------
+      */
 
-      const prodDesc =
-        res.data?.producto?.descripcion ?? res.data?.descripcion ?? "";
-
-      const detalle = res.data?.detalle ?? res.data?.componentes ?? [];
-
-      setDescripcion(prodDesc || "");
-
-      setItems(
-        (detalle || []).map((d) => ({
-          cod_articulo: d.cod_articulo,
-          descripcion: d.descripcion ?? "",
-          cantidad: Number(d.cantidad) || 0,
-        }))
+      const articuloResponse = await api.get(
+        `/articulos/referencia/${encodeURIComponent(referencia)}`,
       );
 
-      if ((detalle || []).length === 0) {
-        setErrorMsg("No existe fórmula para este código");
+      const articulo = articuloResponse.data || {};
+
+      if (!articulo.cod_barra) {
+        return setErrorMsg("El artículo encontrado no tiene código de barras.");
       }
-    } catch (err) {
-      const msg =
-        err?.response?.data?.error ||
-        err.message ||
-        "Error al obtener la fórmula";
-      setErrorMsg(msg);
+
+      const codBarra = String(articulo.cod_barra);
+
+      /*
+      |--------------------------------------------------------------------------
+      | Buscar fórmula por código de barras
+      |--------------------------------------------------------------------------
+      */
+
+      const formulaResponse = await api.get(
+        `/produccion/formulas/${encodeURIComponent(codBarra)}`,
+      );
+
+      const producto = formulaResponse.data?.producto || articulo;
+
+      const detalle = formulaResponse.data?.detalle || [];
+
+      setCodBarraProducto(producto.cod_barra || codBarra);
+
+      setDescripcionProducto(
+        producto.descripcion || articulo.descripcion || "",
+      );
+
+      setBusquedaProducto(
+        producto.descripcion || articulo.descripcion || codBarra,
+      );
+
+      setItems(
+        detalle.map((item) => ({
+          cod_barra: item.cod_barra || "",
+          descripcion: item.descripcion || "",
+          cantidad: Number(item.cantidad) || 0,
+        })),
+      );
+
+      if (!detalle.length) {
+        setFormulaCargada(false);
+
+        return setErrorMsg(
+          "El producto existe, pero no tiene una fórmula creada.",
+        );
+      }
+
+      setFormulaCargada(true);
+    } catch (error) {
+      limpiarFormula();
+
+      const mensaje =
+        error.response?.data?.error ||
+        error.response?.data?.detalle ||
+        "Error al obtener la fórmula.";
+
+      setErrorMsg(mensaje);
     } finally {
-      setCargando(false);
+      setBuscandoFormula(false);
     }
   };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Agregar material
+  |--------------------------------------------------------------------------
+  */
 
   const cargarYContinuar = () => {
     setErrorMsg("");
 
-    const cod = (matCodigo || "").trim().toUpperCase();
-    const cant = Number(normalizarNumero(matCantidad));
+    const codBarra = codBarraMaterial.trim().toUpperCase();
 
-    if (!cod) return setErrorMsg("Ingresá el código del material.");
-    if (!Number.isFinite(cant) || cant <= 0) {
-      return setErrorMsg("La cantidad debe ser mayor que 0. Puede ser decimal.");
+    const cantidad = Number(normalizarNumero(cantidadMaterial));
+
+    if (!formulaCargada) {
+      return setErrorMsg("Primero buscá una fórmula existente.");
     }
 
-    setItems((prev) => {
-      const ix = prev.findIndex((it) => it.cod_articulo === cod);
+    if (!busquedaMaterial.trim()) {
+      return setErrorMsg(
+        "Ingresá el código de barras o la descripción del material.",
+      );
+    }
 
-      if (ix === -1) {
+    if (!codBarra) {
+      return setErrorMsg(
+        "El material no fue encontrado o no tiene código de barras.",
+      );
+    }
+
+    if (!descripcionMaterial) {
+      return setErrorMsg("No se pudo identificar la descripción del material.");
+    }
+
+    if (!Number.isFinite(cantidad) || cantidad <= 0) {
+      return setErrorMsg("La cantidad debe ser mayor que 0.");
+    }
+
+    if (codBarra === codBarraProducto.trim().toUpperCase()) {
+      return setErrorMsg(
+        "El producto no puede agregarse como material de su propia fórmula.",
+      );
+    }
+
+    setItems((previousItems) => {
+      const existingIndex = previousItems.findIndex(
+        (item) => item.cod_barra === codBarra,
+      );
+
+      if (existingIndex === -1) {
         return [
-          ...prev,
+          ...previousItems,
           {
-            cod_articulo: cod,
-            descripcion: matDescripcion || "",
-            cantidad: cant,
+            cod_barra: codBarra,
+            descripcion: descripcionMaterial,
+            cantidad,
           },
         ];
       }
 
-      const copy = [...prev];
-      copy[ix] = {
-        ...copy[ix],
-        cantidad: Number(copy[ix].cantidad) + cant,
+      const updatedItems = [...previousItems];
+
+      updatedItems[existingIndex] = {
+        ...updatedItems[existingIndex],
+        cantidad: Number(updatedItems[existingIndex].cantidad) + cantidad,
       };
-      return copy;
+
+      return updatedItems;
     });
 
-    setMatCodigo("");
-    setMatDescripcion("");
-    setMatCantidad("");
+    limpiarMaterial();
   };
 
-  const quitarItem = (idx) => {
-    setItems((prev) => prev.filter((_, i) => i !== idx));
-  };
+  /*
+  |--------------------------------------------------------------------------
+  | Editar cantidad
+  |--------------------------------------------------------------------------
+  */
 
-  const editarCantidad = (idx, value) => {
-    const v = String(value ?? "").replace(",", ".");
+  const editarCantidad = (index, value) => {
+    const normalized = normalizarNumero(value);
 
-    if (!/^\d*\.?\d*$/.test(v)) return;
+    if (!/^\d*\.?\d*$/.test(normalized)) {
+      return;
+    }
 
-    setItems((prev) => {
-      const copy = [...prev];
-      copy[idx] = {
-        ...copy[idx],
-        cantidad: v,
+    setItems((previousItems) => {
+      const updatedItems = [...previousItems];
+
+      updatedItems[index] = {
+        ...updatedItems[index],
+        cantidad: normalized,
       };
-      return copy;
+
+      return updatedItems;
     });
   };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Quitar material
+  |--------------------------------------------------------------------------
+  */
+
+  const quitarItem = (index) => {
+    setItems((previousItems) =>
+      previousItems.filter((_, itemIndex) => itemIndex !== index),
+    );
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Guardar cambios
+  |--------------------------------------------------------------------------
+  */
 
   const guardarCambios = async () => {
+    setErrorMsg("");
+
+    if (!formulaCargada || !codBarraProducto) {
+      return setErrorMsg("Primero buscá una fórmula existente.");
+    }
+
+    if (!items.length) {
+      return setErrorMsg("La fórmula debe tener al menos un material.");
+    }
+
+    const itemsNormalizados = items.map((item) => ({
+      cod_barra: item.cod_barra,
+      cantidad: Number(normalizarNumero(item.cantidad)),
+    }));
+
+    const tieneCantidadInvalida = itemsNormalizados.some(
+      (item) => !Number.isFinite(item.cantidad) || item.cantidad <= 0,
+    );
+
+    if (tieneCantidadInvalida) {
+      return setErrorMsg("Todas las cantidades deben ser mayores que 0.");
+    }
+
+    const tieneMaterialSinBarra = itemsNormalizados.some(
+      (item) => !item.cod_barra,
+    );
+
+    if (tieneMaterialSinBarra) {
+      return setErrorMsg("Hay materiales sin código de barras.");
+    }
+
     try {
-      setErrorMsg("");
+      setGuardando(true);
 
-      const c = (codigo || "").trim().toUpperCase();
+      const response = await api.put(
+        `/produccion/formulas/${encodeURIComponent(codBarraProducto)}`,
+        {
+          items: itemsNormalizados,
+        },
+      );
 
-      if (!c) return setErrorMsg("Ingresá un código de producto.");
-      if (items.length === 0) {
-        return setErrorMsg('Agregá materiales con "Cargar y continuar".');
-      }
+      alert(response.data?.message || "Fórmula actualizada correctamente.");
 
-      const itemsNormalizados = items.map((it) => ({
-        cod_articulo: it.cod_articulo,
-        cantidad: Number(normalizarNumero(it.cantidad)),
-      }));
-
-      if (
-        itemsNormalizados.some(
-          (it) => !Number.isFinite(it.cantidad) || it.cantidad <= 0
-        )
-      ) {
-        return setErrorMsg("Todas las cantidades deben ser mayores que 0.");
-      }
-
-      const body = {
-        items: itemsNormalizados,
-      };
-
-      await api.put(`/produccion/formulas/${encodeURIComponent(c)}`, body);
-
-      alert("Fórmula actualizada correctamente.");
       navigate("/produccion");
-    } catch (err) {
-      const msg =
-        err?.response?.data?.error ||
-        err?.response?.data?.detalle ||
-        err.message ||
-        "Error al actualizar la fórmula";
-      setErrorMsg(msg);
+    } catch (error) {
+      const detalle = error.response?.data?.detalle;
+
+      let mensaje =
+        error.response?.data?.error ||
+        error.message ||
+        "Error al actualizar la fórmula.";
+
+      if (Array.isArray(detalle)) {
+        mensaje += `: ${detalle.join(", ")}`;
+      } else if (detalle && typeof detalle === "string") {
+        mensaje += `: ${detalle}`;
+      }
+
+      setErrorMsg(mensaje);
+    } finally {
+      setGuardando(false);
     }
   };
 
-  const puedeGuardar = useMemo(
-    () =>
-      (codigo || "").trim() &&
-      items.length > 0 &&
-      items.every((i) => {
-        const n = Number(normalizarNumero(i.cantidad));
-        return Number.isFinite(n) && n > 0;
-      }),
-    [codigo, items]
-  );
+  /*
+  |--------------------------------------------------------------------------
+  | Estado de botones
+  |--------------------------------------------------------------------------
+  */
+
+  const puedeAgregarMaterial = useMemo(() => {
+    const cantidad = Number(normalizarNumero(cantidadMaterial));
+
+    return (
+      formulaCargada &&
+      Boolean(codBarraMaterial) &&
+      Boolean(descripcionMaterial) &&
+      Number.isFinite(cantidad) &&
+      cantidad > 0 &&
+      !buscandoMaterial
+    );
+  }, [
+    formulaCargada,
+    codBarraMaterial,
+    descripcionMaterial,
+    cantidadMaterial,
+    buscandoMaterial,
+  ]);
+
+  const puedeGuardar = useMemo(() => {
+    if (!formulaCargada || !codBarraProducto || !items.length || guardando) {
+      return false;
+    }
+
+    return items.every((item) => {
+      const cantidad = Number(normalizarNumero(item.cantidad));
+
+      return (
+        Boolean(item.cod_barra) && Number.isFinite(cantidad) && cantidad > 0
+      );
+    });
+  }, [formulaCargada, codBarraProducto, items, guardando]);
 
   return (
     <div className="nueva-transferencia-page">
       <div className="nt-header">
         <h2 className="module-title">Editar fórmula</h2>
 
-        <button className="nt-volver" onClick={() => navigate("/produccion")}>
+        <button
+          type="button"
+          className="nt-volver"
+          onClick={() => navigate("/produccion")}
+        >
           ← Volver
         </button>
       </div>
@@ -231,111 +477,185 @@ export default function EditarFormula() {
       {errorMsg && <div className="nt-error">{errorMsg}</div>}
 
       <div className="nt-card">
+        <h4>Buscar fórmula</h4>
+
         <div className="nt-row">
           <div className="nt-field">
-            <label>Código producto</label>
+            <label>Código de barras o descripción</label>
+
             <input
               type="text"
-              placeholder="Código de producto…"
-              value={codigo}
-              onChange={(e) => {
-                setCodigo(e.target.value);
-                setDescripcion("");
-                setItems([]);
+              placeholder="Escanee el código o escriba la descripción…"
+              value={busquedaProducto}
+              onChange={(event) => {
+                setBusquedaProducto(event.target.value);
+
+                limpiarFormula();
+                setErrorMsg("");
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  buscarFormula();
+                }
+              }}
+            />
+          </div>
+
+          <div className="nt-field">
+            <label>Código de barras</label>
+
+            <input
+              type="text"
+              value={codBarraProducto}
+              readOnly
+              placeholder="Se completa al buscar"
+            />
+          </div>
+
+          <div className="nt-field">
+            <label>Descripción</label>
+
+            <input
+              type="text"
+              value={descripcionProducto}
+              readOnly
+              placeholder="Se completa al buscar"
+            />
+          </div>
+
+          <div className="nt-actions">
+            <button
+              type="button"
+              className="btn-light"
+              onClick={buscarFormula}
+              disabled={buscandoFormula}
+            >
+              {buscandoFormula ? "Buscando…" : "Buscar fórmula"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="nt-card">
+        <h4>Agregar materiales</h4>
+
+        <div className="nt-row">
+          <div className="nt-field">
+            <label>Código de barras o descripción</label>
+
+            <input
+              type="text"
+              placeholder="Escanee o escriba la descripción…"
+              value={busquedaMaterial}
+              disabled={!formulaCargada}
+              onChange={(event) => {
+                setBusquedaMaterial(event.target.value);
+
+                setCodBarraMaterial("");
+                setDescripcionMaterial("");
+
                 setErrorMsg("");
               }}
             />
           </div>
 
           <div className="nt-field">
-            <label>Descripción</label>
+            <label>Código de barras</label>
+
             <input
               type="text"
-              value={descripcion}
+              value={codBarraMaterial}
               readOnly
-              placeholder="Se completa al buscar fórmula"
-            />
-          </div>
-
-          <div className="nt-actions">
-            <button
-              className="btn-light"
-              onClick={buscarFormula}
-              disabled={cargando}
-            >
-              {cargando ? "Buscando…" : "Buscar fórmula"}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="nt-card">
-        <h4>Materiales</h4>
-
-        <div className="nt-row">
-          <div className="nt-field">
-            <label>Ingrese un material (código)</label>
-            <input
-              type="text"
-              placeholder="Código material…"
-              value={matCodigo}
-              onChange={(e) => setMatCodigo(e.target.value)}
-              disabled={!descripcion}
+              placeholder={
+                buscandoMaterial ? "Buscando…" : "Se completa automáticamente"
+              }
             />
           </div>
 
           <div className="nt-field">
             <label>Descripción</label>
+
             <input
               type="text"
-              value={matDescripcion}
+              value={descripcionMaterial}
               readOnly
-              placeholder="Se completa desde el código"
+              placeholder={
+                buscandoMaterial ? "Buscando…" : "Se completa automáticamente"
+              }
             />
           </div>
 
           <div className="nt-field small">
             <label>Cantidad</label>
+
             <input
               type="text"
               inputMode="decimal"
-              value={matCantidad}
               placeholder="Ej: 0.25"
-              onChange={(e) =>
-                permitirDecimalPositivo(e.target.value, setMatCantidad)
+              value={cantidadMaterial}
+              disabled={!formulaCargada}
+              onChange={(event) =>
+                permitirDecimalPositivo(event.target.value, setCantidadMaterial)
               }
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && puedeAgregarMaterial) {
+                  event.preventDefault();
+                  cargarYContinuar();
+                }
+              }}
             />
           </div>
 
           <div className="nt-actions">
             <button
+              type="button"
               className="btn-light"
               onClick={cargarYContinuar}
-              disabled={!descripcion}
+              disabled={!puedeAgregarMaterial}
             >
               Cargar y continuar
             </button>
 
             <button
+              type="button"
               className="btn-primary"
               onClick={guardarCambios}
               disabled={!puedeGuardar}
             >
-              Confirmar
+              {guardando ? "Guardando…" : "Confirmar"}
             </button>
           </div>
         </div>
       </div>
 
       <div className="nt-card">
+        <h4>Materiales de la fórmula</h4>
+
         <div className="tabla-articulos-container">
           <table className="tabla-articulos">
             <thead>
               <tr>
-                <th>Código</th>
+                <th>Código de barras</th>
+
                 <th>Descripción</th>
-                <th style={{ textAlign: "right", width: 120 }}>Cantidad</th>
-                <th style={{ width: 100 }}>Acción</th>
+
+                <th
+                  style={{
+                    textAlign: "right",
+                    width: 130,
+                  }}
+                >
+                  Cantidad
+                </th>
+
+                <th
+                  style={{
+                    width: 100,
+                  }}
+                >
+                  Acción
+                </th>
               </tr>
             </thead>
 
@@ -343,27 +663,42 @@ export default function EditarFormula() {
               {items.length === 0 ? (
                 <tr>
                   <td colSpan={4}>
-                    No hay materiales. Cargá con “Cargar y continuar”.
+                    {formulaCargada
+                      ? "La fórmula no tiene materiales."
+                      : "Buscá una fórmula para ver sus materiales."}
                   </td>
                 </tr>
               ) : (
-                items.map((it, idx) => (
-                  <tr key={idx}>
-                    <td>{it.cod_articulo}</td>
-                    <td>{it.descripcion}</td>
-                    <td style={{ textAlign: "right" }}>
+                items.map((item, index) => (
+                  <tr key={item.cod_barra}>
+                    <td>{item.cod_barra}</td>
+
+                    <td>{item.descripcion}</td>
+
+                    <td
+                      style={{
+                        textAlign: "right",
+                      }}
+                    >
                       <input
                         type="text"
                         inputMode="decimal"
-                        value={it.cantidad}
-                        onChange={(e) => editarCantidad(idx, e.target.value)}
-                        style={{ width: 90, textAlign: "right" }}
+                        value={item.cantidad}
+                        onChange={(event) =>
+                          editarCantidad(index, event.target.value)
+                        }
+                        style={{
+                          width: 90,
+                          textAlign: "right",
+                        }}
                       />
                     </td>
+
                     <td>
                       <button
+                        type="button"
                         className="borrar-btn"
-                        onClick={() => quitarItem(idx)}
+                        onClick={() => quitarItem(index)}
                       >
                         Quitar
                       </button>

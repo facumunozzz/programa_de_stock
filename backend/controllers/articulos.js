@@ -90,6 +90,115 @@ exports.getByCodigo = async (req, res) => {
 };
 
 // -----------------------------------------------------------------------------
+// GET /articulos/referencia/:valor
+// Busca por código de barras o por descripción exacta.
+// Devuelve siempre el código de barras real del artículo.
+// -----------------------------------------------------------------------------
+exports.getByReferencia = async (req, res) => {
+  try {
+    const valor = String(req.params.valor || "").trim();
+
+    if (!valor) {
+      return res.status(400).json({
+        error: "Debe ingresar un código de barras o una descripción",
+      });
+    }
+
+    await poolConnect;
+    const pool = await getPool();
+
+    // Primero intenta encontrarlo por código de barras.
+    const porBarra = await pool
+      .request()
+      .input("valor", sql.VarChar, valor.toUpperCase())
+      .query(`
+        SELECT TOP 1
+          id_articulo,
+          cod_articulo,
+          cod_barra,
+          descripcion,
+          cod_modelo,
+          color,
+          talle,
+          tipo,
+          familia,
+          subfamilia,
+          material
+        FROM dbo.articulos
+        WHERE UPPER(LTRIM(RTRIM(cod_barra))) = @valor
+      `);
+
+    if (porBarra.recordset.length) {
+      const articulo = porBarra.recordset[0];
+
+      if (!articulo.cod_barra) {
+        return res.status(400).json({
+          error: "El artículo encontrado no tiene código de barras",
+        });
+      }
+
+      return res.json(articulo);
+    }
+
+    // Si no era un código de barras, busca descripción exacta.
+    const porDescripcion = await pool
+      .request()
+      .input("descripcion", sql.VarChar, valor.toUpperCase())
+      .query(`
+        SELECT
+          id_articulo,
+          cod_articulo,
+          cod_barra,
+          descripcion,
+          cod_modelo,
+          color,
+          talle,
+          tipo,
+          familia,
+          subfamilia,
+          material
+        FROM dbo.articulos
+        WHERE UPPER(LTRIM(RTRIM(descripcion))) = @descripcion
+        ORDER BY id_articulo
+      `);
+
+    if (!porDescripcion.recordset.length) {
+      return res.status(404).json({
+        error: "No se encontró un artículo con ese código de barras o descripción",
+      });
+    }
+
+    if (porDescripcion.recordset.length > 1) {
+      return res.status(409).json({
+        error:
+          "Existe más de un artículo con esa descripción. Ingrese el código de barras.",
+        coincidencias: porDescripcion.recordset.map((articulo) => ({
+          cod_barra: articulo.cod_barra,
+          descripcion: articulo.descripcion,
+        })),
+      });
+    }
+
+    const articulo = porDescripcion.recordset[0];
+
+    if (!articulo.cod_barra) {
+      return res.status(400).json({
+        error: "El artículo encontrado no tiene código de barras",
+      });
+    }
+
+    return res.json(articulo);
+  } catch (err) {
+    console.error("articulos.getByReferencia:", err);
+
+    return res.status(500).json({
+      error: "Error al buscar el artículo",
+      detalle: err.message,
+    });
+  }
+};
+
+// -----------------------------------------------------------------------------
 // CREAR
 // -----------------------------------------------------------------------------
 exports.createArticulo = async (req, res) => {
