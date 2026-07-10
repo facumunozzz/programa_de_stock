@@ -16,10 +16,8 @@ export default function NuevoRemito() {
 
   const [proveedorId, setProveedorId] = useState("");
   const [tipo, setTipo] = useState("EGRESO");
-  const [codigoMaterial, setCodigoMaterial] = useState("");
-  const [descripcionMaterial, setDescripcionMaterial] = useState("");
-  const [cantidadPadre, setCantidadPadre] = useState("");
-  const [cantidadBultos, setCantidadBultos] = useState("");
+  const [descripcionSeleccionada, setDescripcionSeleccionada] = useState("");
+  const [variantesSeleccionadas, setVariantesSeleccionadas] = useState([]);
 
   const [items, setItems] = useState([]);
   const [errorMsg, setErrorMsg] = useState("");
@@ -61,101 +59,105 @@ export default function NuevoRemito() {
     try {
       setErrorMsg("");
 
-      const codigo = codigoMaterial.trim().toUpperCase();
-      const cantPadre = toNumber(cantidadPadre);
-
-      if (!codigo) {
-        return setErrorMsg("Seleccioná un artículo a enviar.");
+      if (!descripcionSeleccionada) {
+        return setErrorMsg("Seleccioná una descripción.");
       }
 
-      if (!Number.isFinite(cantPadre) || cantPadre <= 0) {
-        return setErrorMsg("Ingresá la cantidad del producto padre.");
-      }
+      const variantesConCantidad = variantesSeleccionadas.filter((variante) => {
+        const cantidad = toNumber(variante.cantidad);
 
-      const res = await api.get(
-        `/remitos/articulos/${encodeURIComponent(codigo)}/materiales?cantidad=${cantPadre}`,
-      );
+        return Number.isFinite(cantidad) && cantidad > 0;
+      });
 
-      const prodDesc = res.data?.producto?.descripcion || "";
-      const detalle = res.data?.detalle || [];
-
-      if (!detalle.length) {
-        setDescripcionMaterial(prodDesc);
+      if (!variantesConCantidad.length) {
         return setErrorMsg(
-          "Ese artículo no tiene materiales cargados en la fórmula.",
+          "Ingresá una cantidad en al menos uno de los talles.",
         );
       }
 
-      setDescripcionMaterial(prodDesc);
+      const respuestas = await Promise.all(
+        variantesConCantidad.map((variante) =>
+          api.get(
+            `/remitos/articulos/${encodeURIComponent(
+              variante.cod_articulo,
+            )}/materiales?cantidad=${toNumber(variante.cantidad)}`,
+          ),
+        ),
+      );
 
-      const nuevosItems = detalle.map((d) => ({
-        codigo: d.codigo,
-        descripcion: d.descripcion || "",
-        bultos: "",
-        cantidad: Number(d.cantidad_total || 0),
-        um: "",
-        control: "",
-        observaciones: "",
-        deposito_id: "",
-      }));
+      const mapaMateriales = new Map();
 
-      setItems((prev) => {
-        const mapa = new Map();
+      for (const respuesta of respuestas) {
+        const detalle = respuesta.data?.detalle || [];
 
-        // Primero cargo lo que ya estaba
-        for (const item of prev) {
-          const key = String(item.codigo || "")
+        for (const material of detalle) {
+          const codigo = String(material.codigo || "")
             .trim()
             .toUpperCase();
 
-          if (!key) continue;
+          if (!codigo) continue;
 
-          mapa.set(key, {
-            ...item,
-            codigo: key,
-            cantidad: toNumber(item.cantidad || 0),
-          });
-        }
+          const cantidadNueva = toNumber(material.cantidad_total || 0);
 
-        // Después agrego lo nuevo o sumo si ya existía
-        for (const nuevo of nuevosItems) {
-          const key = String(nuevo.codigo || "")
-            .trim()
-            .toUpperCase();
+          if (mapaMateriales.has(codigo)) {
+            const existente = mapaMateriales.get(codigo);
 
-          if (!key) continue;
-
-          if (mapa.has(key)) {
-            const existente = mapa.get(key);
-
-            mapa.set(key, {
+            mapaMateriales.set(codigo, {
               ...existente,
-              cantidad:
-                toNumber(existente.cantidad || 0) +
-                toNumber(nuevo.cantidad || 0),
+              cantidad: toNumber(existente.cantidad || 0) + cantidadNueva,
             });
           } else {
-            mapa.set(key, nuevo);
+            mapaMateriales.set(codigo, {
+              codigo,
+              descripcion: material.descripcion || "",
+              bultos: "",
+              cantidad: cantidadNueva,
+              um: "",
+              control: "",
+              observaciones: "",
+              deposito_id: "",
+            });
           }
         }
+      }
 
-        return Array.from(mapa.values());
-      });
+      const materialesTotales = Array.from(mapaMateriales.values());
+
+      if (!materialesTotales.length) {
+        return setErrorMsg(
+          "Los talles seleccionados no tienen materiales en sus fórmulas.",
+        );
+      }
+
+      setItems(materialesTotales);
     } catch (err) {
       console.error(err);
-      setDescripcionMaterial("");
+
       setErrorMsg(
         err.response?.data?.error ||
           err.response?.data?.detalle ||
-          "No se pudo obtener la fórmula del artículo.",
+          "No se pudieron cargar los materiales.",
       );
     }
   };
 
+  const cantidadBultos = useMemo(() => {
+    return items.reduce((total, item) => {
+      const bultos = toNumber(item.bultos || 0);
+
+      return total + (Number.isFinite(bultos) ? bultos : 0);
+    }, 0);
+  }, [items]);
+
   const actualizarItem = (idx, campo, valor) => {
     setItems((prev) => {
       const copy = [...prev];
-      copy[idx] = { ...copy[idx], [campo]: valor };
+
+      copy[idx] = {
+        ...copy[idx],
+        [campo]: valor,
+      };
+
       return copy;
     });
   };
@@ -170,16 +172,108 @@ export default function NuevoRemito() {
     );
   }, [proveedores, proveedorId]);
 
+  const articulosPorDescripcion = useMemo(() => {
+    const mapa = new Map();
+
+    for (const articulo of articulosActivos) {
+      const descripcion = String(articulo.descripcion || "").trim();
+
+      if (!descripcion) continue;
+
+      const clave = descripcion.toUpperCase();
+
+      if (!mapa.has(clave)) {
+        mapa.set(clave, {
+          descripcion,
+          variantes: [],
+        });
+      }
+
+      mapa.get(clave).variantes.push({
+        id_articulo: articulo.id_articulo,
+        cod_articulo: articulo.cod_articulo,
+        cod_barra: articulo.cod_barra,
+        talle: articulo.talle,
+        color: articulo.color,
+        cod_modelo: articulo.cod_modelo,
+        cantidad: "",
+      });
+    }
+
+    return Array.from(mapa.values()).sort((a, b) =>
+      a.descripcion.localeCompare(b.descripcion, "es"),
+    );
+  }, [articulosActivos]);
+
+  const seleccionarDescripcion = (descripcion) => {
+    setDescripcionSeleccionada(descripcion);
+    setItems([]);
+    setErrorMsg("");
+
+    if (!descripcion) {
+      setVariantesSeleccionadas([]);
+      return;
+    }
+
+    const grupo = articulosPorDescripcion.find(
+      (g) =>
+        String(g.descripcion).trim().toUpperCase() ===
+        String(descripcion).trim().toUpperCase(),
+    );
+
+    setVariantesSeleccionadas(
+      (grupo?.variantes || []).map((variante) => ({
+        ...variante,
+        cantidad: "",
+      })),
+    );
+  };
+
+  const actualizarCantidadVariante = (idx, valor) => {
+    setVariantesSeleccionadas((prev) => {
+      const copia = [...prev];
+
+      copia[idx] = {
+        ...copia[idx],
+        cantidad: valor,
+      };
+
+      return copia;
+    });
+
+    setItems([]);
+  };
+
   const guardarRemito = async () => {
     try {
       setErrorMsg("");
 
-      if (!proveedorId) return setErrorMsg("Seleccioná un proveedor.");
-      if (!codigoMaterial.trim())
-        return setErrorMsg("Indicá el material a enviar.");
-      if (!items.length) return setErrorMsg("No hay materiales cargados.");
-      if (!cantidadBultos || toNumber(cantidadBultos) <= 0) {
-        return setErrorMsg("Indicá una cantidad de bultos válida.");
+      if (!proveedorId) {
+        return setErrorMsg("Seleccioná un proveedor.");
+      }
+
+      if (!descripcionSeleccionada) {
+        return setErrorMsg("Seleccioná una descripción.");
+      }
+
+      const variantesConCantidad = variantesSeleccionadas.filter(
+        (variante) => toNumber(variante.cantidad) > 0,
+      );
+
+      if (!variantesConCantidad.length) {
+        return setErrorMsg("Ingresá una cantidad en al menos un talle.");
+      }
+
+      if (!items.length) {
+        return setErrorMsg(
+          "Presioná Cargar materiales antes de guardar el remito.",
+        );
+      }
+
+      if (cantidadBultos <= 0) {
+        return setErrorMsg(
+          "Ingresá los bultos correspondientes en el detalle.",
+        );
       }
 
       const itemsNormalizados = items.map((it) => ({
@@ -197,25 +291,57 @@ export default function NuevoRemito() {
         return setErrorMsg("Todos los ítems deben tener depósito.");
       }
 
+      const cantidadTotalProductos = variantesSeleccionadas.reduce(
+        (total, variante) => {
+          const cantidad = toNumber(variante.cantidad || 0);
+
+          return total + (Number.isFinite(cantidad) ? cantidad : 0);
+        },
+        0,
+      );
+
+      const detalleVariantes = variantesSeleccionadas
+        .filter((variante) => toNumber(variante.cantidad) > 0)
+        .map((variante) => ({
+          id_articulo: variante.id_articulo,
+          codigo: variante.cod_articulo,
+          cod_barra: variante.cod_barra,
+          talle: variante.talle,
+          color: variante.color,
+          cantidad: toNumber(variante.cantidad),
+        }));
+
       const body = {
         tipo,
         id_proveedor: Number(proveedorId),
         proveedor: proveedorSeleccionado?.nombre || "",
-        material_codigo: codigoMaterial.trim().toUpperCase(),
-        material_descripcion: descripcionMaterial,
-        cantidad_padre: toNumber(cantidadPadre),
-        cantidad_bultos: toNumber(cantidadBultos),
+
+        material_codigo: detalleVariantes
+          .map((variante) => variante.codigo)
+          .join(", "),
+
+        material_descripcion: descripcionSeleccionada,
+
+        cantidad_padre: cantidadTotalProductos,
+        cantidad_bultos: cantidadBultos,
+
+        variantes: detalleVariantes,
+
         items: itemsNormalizados,
       };
 
       const res = await api.post("/remitos", body);
 
       alert(
-        `Remito guardado correctamente: ${res.data?.remito?.nro_remito || "OK"}`,
+        `Remito guardado correctamente: ${
+          res.data?.remito?.nro_remito || "OK"
+        }`,
       );
+
       navigate("/remitos");
     } catch (err) {
       console.error(err);
+
       setErrorMsg(
         err.response?.data?.error ||
           err.response?.data?.detalle ||
@@ -236,6 +362,7 @@ export default function NuevoRemito() {
         <div className="remito-top">
           <div>
             <h1 className="remito-label">REMITO</h1>
+
             <div className="remito-fecha">
               <b>FECHA:</b> {fecha.toLocaleDateString("es-AR")}
             </div>
@@ -250,7 +377,9 @@ export default function NuevoRemito() {
 
         <div className="remito-botones no-print">
           <button onClick={imprimirRemito}>IMPRIMIR REMITO</button>
+
           <button onClick={guardarRemito}>GUARDAR REMITO</button>
+
           <button className="danger" onClick={() => navigate("/remitos")}>
             CANCELAR REMITO
           </button>
@@ -261,11 +390,13 @@ export default function NuevoRemito() {
         <div className="remito-form-grid">
           <div className="remito-campo proveedor">
             <label>NOMBRE PROVEEDOR</label>
+
             <select
               value={proveedorId}
               onChange={(e) => setProveedorId(e.target.value)}
             >
               <option value="">-- Seleccionar proveedor --</option>
+
               {proveedores.map((p) => (
                 <option key={p.id_proveedor} value={p.id_proveedor}>
                   {p.nombre}
@@ -276,81 +407,101 @@ export default function NuevoRemito() {
 
           <div className="remito-campo bultos">
             <label>CANT DE BULTOS</label>
-            <input
-              type="number"
-              min="1"
-              value={cantidadBultos}
-              onChange={(e) => setCantidadBultos(e.target.value)}
-            />
+
+            <input type="number" value={cantidadBultos} readOnly disabled />
           </div>
 
           <div className="remito-campo material">
             <label>MATERIAL A ENVIAR</label>
+
             <div className="material-line">
               <select
-                value={codigoMaterial}
-                onChange={(e) => {
-                  const codigo = e.target.value;
-                  setCodigoMaterial(codigo);
-
-                  const art = articulosActivos.find(
-                    (a) =>
-                      String(a.cod_articulo).toUpperCase() ===
-                      String(codigo).toUpperCase(),
-                  );
-
-                  setDescripcionMaterial(art?.descripcion || "");
-                }}
+                value={descripcionSeleccionada}
+                onChange={(e) => seleccionarDescripcion(e.target.value)}
                 style={{
-                  width: "280px",
-                  minWidth: "280px",
-                  maxWidth: "280px",
+                  width: "420px",
+                  minWidth: "420px",
+                  maxWidth: "420px",
                 }}
               >
-                <option value="">-- Seleccionar artículo --</option>
+                <option value="">-- Seleccionar descripción --</option>
 
-                {articulosActivos.map((a) => (
-                  <option key={a.id_articulo} value={a.cod_articulo}>
-                    {a.cod_articulo} - {a.descripcion}
+                {articulosPorDescripcion.map((grupo) => (
+                  <option key={grupo.descripcion} value={grupo.descripcion}>
+                    {grupo.descripcion}
                   </option>
                 ))}
               </select>
-
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={cantidadPadre}
-                placeholder="Cantidad"
-                onChange={(e) => setCantidadPadre(e.target.value)}
-                style={{
-                  width: "160px",
-                  minWidth: "160px",
-                  maxWidth: "160px",
-                  textAlign: "center",
-                }}
-              />
-
-              <button
-                className="no-print"
-                onClick={buscarMaterial}
-                style={{
-                  minWidth: "180px",
-                  padding: "10px 18px",
-                  fontSize: "14px",
-                  fontWeight: "600",
-                }}
-              >
-                Cargar materiales
-              </button>
             </div>
-            <small>{descripcionMaterial}</small>
+
+            {variantesSeleccionadas.length > 0 && (
+              <div className="variantes-remito">
+                <table className="tabla-variantes-remito">
+                  <thead>
+                    <tr>
+                      <th>TALLE</th>
+                      <th>COLOR</th>
+                      <th>CÓDIGO DE BARRAS</th>
+                      <th>CÓDIGO ARTÍCULO</th>
+                      <th>CANTIDAD</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {variantesSeleccionadas.map((variante, idx) => (
+                      <tr key={variante.id_articulo}>
+                        <td>{variante.talle || "-"}</td>
+                        <td>{variante.color || "-"}</td>
+
+                        <td>{variante.cod_barra || "-"}</td>
+
+                        <td>{variante.cod_articulo}</td>
+
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={variante.cantidad}
+                            onChange={(e) =>
+                              actualizarCantidadVariante(idx, e.target.value)
+                            }
+                            style={{
+                              width: "110px",
+                              textAlign: "center",
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <button
+                  type="button"
+                  className="no-print"
+                  onClick={buscarMaterial}
+                  style={{
+                    marginTop: "12px",
+                    minWidth: "180px",
+                    padding: "10px 18px",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                  }}
+                >
+                  Cargar materiales
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="remito-campo tipo">
             <label>INGRESO / EGRESO</label>
+
             <button
-              className={`switch-remito ${tipo === "INGRESO" ? "ingreso" : "egreso"}`}
+              className={`switch-remito ${
+                tipo === "INGRESO" ? "ingreso" : "egreso"
+              }`}
               onClick={() => setTipo(tipo === "INGRESO" ? "EGRESO" : "INGRESO")}
             >
               {tipo}
@@ -385,8 +536,11 @@ export default function NuevoRemito() {
               items.map((it, idx) => (
                 <tr key={idx}>
                   <td>{idx + 1}</td>
+
                   <td>{it.codigo}</td>
+
                   <td>{it.descripcion}</td>
+
                   <td>
                     <input
                       type="number"
@@ -396,6 +550,7 @@ export default function NuevoRemito() {
                       }
                     />
                   </td>
+
                   <td>
                     <input
                       type="number"
@@ -406,6 +561,7 @@ export default function NuevoRemito() {
                       }
                     />
                   </td>
+
                   <td>
                     <input
                       value={it.um}
@@ -414,6 +570,7 @@ export default function NuevoRemito() {
                       }
                     />
                   </td>
+
                   <td>
                     <input
                       value={it.control}
@@ -422,6 +579,7 @@ export default function NuevoRemito() {
                       }
                     />
                   </td>
+
                   <td>
                     <input
                       value={it.observaciones}
@@ -430,9 +588,11 @@ export default function NuevoRemito() {
                       }
                     />
                   </td>
+
                   <td className="no-print">
                     <button onClick={() => quitarItem(idx)}>Eliminar</button>
                   </td>
+
                   <td>
                     <select
                       value={it.deposito_id}
@@ -441,6 +601,7 @@ export default function NuevoRemito() {
                       }
                     >
                       <option value="">-- Depósito --</option>
+
                       {depositos.map((d) => (
                         <option key={d.id_deposito} value={d.id_deposito}>
                           {d.nombre}

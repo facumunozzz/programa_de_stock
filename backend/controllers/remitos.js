@@ -308,11 +308,7 @@ exports.getArticulosConFormula = async (_req, res) => {
 
 // ========================================================
 // SOLO ARTÍCULOS ACTIVOS PARA USAR EN REMITOS
-// ========================================================
-// ========================================================
-// SOLO ARTÍCULOS ACTIVOS PARA USAR EN REMITOS
-// Los artículos sin configuración previa se consideran activos.
-// Los desactivados expresamente quedan excluidos.
+// Incluye talle y código de barras para agrupar por descripción
 // ========================================================
 exports.getArticulosActivos = async (_req, res) => {
   try {
@@ -320,11 +316,14 @@ exports.getArticulosActivos = async (_req, res) => {
     const pool = await getPool();
 
     const r = await pool.request().query(`
-      SELECT
+      SELECT DISTINCT
         a.id_articulo,
         a.cod_articulo,
         a.cod_barra,
-        a.descripcion
+        a.descripcion,
+        a.talle,
+        a.color,
+        a.cod_modelo
 
       FROM dbo.articulos a
 
@@ -338,27 +337,21 @@ exports.getArticulosActivos = async (_req, res) => {
 
       ORDER BY
         a.descripcion,
+        a.talle,
         a.cod_articulo
     `);
 
     return res.json(r.recordset || []);
   } catch (err) {
-    console.error(
-      "remitos.getArticulosActivos:",
-      err
-    );
+    console.error("remitos.getArticulosActivos:", err);
 
     return res.status(500).json({
-      error:
-        "Error al listar artículos activos para remitos",
+      error: "Error al listar artículos activos para remitos",
       detalle: err.message,
     });
   }
 };
 
-// ========================================================
-// ACTIVAR / DESACTIVAR ARTÍCULO PARA REMITOS
-// ========================================================
 exports.toggleArticuloRemito = async (req, res) => {
   try {
     const idArticulo = Number(req.params.id);
@@ -444,14 +437,19 @@ exports.getMaterialesArticuloRemito = async (req, res) => {
         SELECT TOP 1
           a.id_articulo,
           a.cod_articulo,
-          a.descripcion
+          a.cod_barra,
+          a.descripcion,
+          a.talle
         FROM dbo.articulos a
-        INNER JOIN dbo.remito_articulos ra
-          ON ra.id_articulo = a.id_articulo
-         AND ra.activo = 1
+
         INNER JOIN dbo.produccion_formulas f
           ON f.producto_id = a.id_articulo
+
+        LEFT JOIN dbo.remito_articulos ra
+          ON ra.id_articulo = a.id_articulo
+
         WHERE UPPER(LTRIM(RTRIM(a.cod_articulo))) = @codigo
+          AND ISNULL(ra.activo, 1) = 1
       `);
 
     if (!productoRes.recordset.length) {
