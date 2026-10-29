@@ -293,65 +293,60 @@ exports.getByDepositoId = async (req, res) => {
   }
 };
 
-// =====================================================
-// POST /stock
-// Crear o actualizar stock de un artículo en un depósito
-// Body esperado:
-// {
-//   "id_articulo": 1,
-//   "id_deposito": 1,
-//   "cantidad": 10,
-//   "asignado": 0
-// }
-// =====================================================
 exports.upsertStock = async (req, res) => {
   try {
     const idArticulo = Number(req.body?.id_articulo);
     const idDeposito = Number(req.body?.id_deposito);
     const cantidad = Number(req.body?.cantidad ?? 0);
     const asignado = Number(req.body?.asignado ?? 0);
-    const disponible = cantidad - asignado;
 
     if (!Number.isInteger(idArticulo)) {
-      return res.status(400).json({ error: "id_articulo inválido" });
+      return res.status(400).json({
+        error: "id_articulo inválido",
+      });
     }
 
     if (!Number.isInteger(idDeposito)) {
-      return res.status(400).json({ error: "id_deposito inválido" });
+      return res.status(400).json({
+        error: "id_deposito inválido",
+      });
     }
 
-    if (Number.isNaN(cantidad)) {
-      return res.status(400).json({ error: "cantidad inválida" });
+    if (!Number.isFinite(cantidad)) {
+      return res.status(400).json({
+        error: "cantidad inválida",
+      });
     }
 
-    if (Number.isNaN(asignado)) {
-      return res.status(400).json({ error: "asignado inválido" });
+    if (!Number.isFinite(asignado)) {
+      return res.status(400).json({
+        error: "asignado inválido",
+      });
     }
 
     await poolConnect;
+
     const pool = await getPool();
 
-    const result = await pool
-      .request()
+    const result = await pool.request()
       .input("id_articulo", sql.Int, idArticulo)
       .input("id_deposito", sql.Int, idDeposito)
       .input("cantidad", sql.Decimal(18, 2), cantidad)
       .input("asignado", sql.Decimal(18, 2), asignado)
-      .input("disponible", sql.Decimal(18, 2), disponible)
       .query(`
         IF EXISTS (
           SELECT 1
           FROM dbo.stock
-          WHERE id_articulo = @id_articulo
-            AND id_deposito = @id_deposito
+          WHERE id_articulo=@id_articulo
+            AND id_deposito=@id_deposito
         )
         BEGIN
           UPDATE dbo.stock
-             SET cantidad = @cantidad,
-                 asignado = @asignado,
-                 disponible = @disponible
-           WHERE id_articulo = @id_articulo
-             AND id_deposito = @id_deposito;
+          SET
+            cantidad=@cantidad,
+            asignado=@asignado
+          WHERE id_articulo=@id_articulo
+            AND id_deposito=@id_deposito;
         END
         ELSE
         BEGIN
@@ -359,17 +354,15 @@ exports.upsertStock = async (req, res) => {
             id_articulo,
             id_deposito,
             cantidad,
-            asignado,
-            disponible
+            asignado
           )
           VALUES (
             @id_articulo,
             @id_deposito,
             @cantidad,
-            @asignado,
-            @disponible
+            @asignado
           );
-        END
+        END;
 
         SELECT
           s.id_stock,
@@ -377,26 +370,27 @@ exports.upsertStock = async (req, res) => {
           a.cod_articulo,
           a.descripcion,
           s.id_deposito,
-          ISNULL(d.nombre, 'SIN DEPÓSITO') AS deposito,
-          ISNULL(s.cantidad, 0) AS cantidad,
-          ISNULL(s.asignado, 0) AS asignado,
-          ISNULL(s.disponible, 0) AS disponible
+          ISNULL(d.nombre,'SIN DEPÓSITO') AS deposito,
+          ISNULL(s.cantidad,0) AS cantidad,
+          ISNULL(s.asignado,0) AS asignado,
+          ISNULL(s.disponible,0) AS disponible
         FROM dbo.stock s
         INNER JOIN dbo.articulos a
-          ON a.id_articulo = s.id_articulo
+          ON a.id_articulo=s.id_articulo
         LEFT JOIN dbo.depositos d
-          ON d.id_deposito = s.id_deposito
-        WHERE s.id_articulo = @id_articulo
-          AND s.id_deposito = @id_deposito;
+          ON d.id_deposito=s.id_deposito
+        WHERE s.id_articulo=@id_articulo
+          AND s.id_deposito=@id_deposito;
       `);
 
-    res.json({
+    return res.json({
       message: "Stock actualizado correctamente",
       stock: result.recordset?.[0] || null,
     });
   } catch (err) {
     console.error("Error en stock.upsertStock:", err);
-    res.status(500).json({
+
+    return res.status(500).json({
       error: "Error al guardar stock",
       detalle: err.message,
     });
@@ -407,49 +401,44 @@ exports.upsertStock = async (req, res) => {
 exports.createOrUpdateStock = exports.upsertStock;
 exports.guardarStock = exports.upsertStock;
 
-// =====================================================
-// PUT /stock/:id_stock
-// Actualizar cantidad/asignado por id_stock
-// Body:
-// {
-//   "cantidad": 10,
-//   "asignado": 2
-// }
-// =====================================================
 exports.updateStock = async (req, res) => {
   try {
     const idStock = Number(req.params.id_stock || req.params.id);
     const cantidad = Number(req.body?.cantidad ?? 0);
     const asignado = Number(req.body?.asignado ?? 0);
-    const disponible = cantidad - asignado;
 
     if (!Number.isInteger(idStock)) {
-      return res.status(400).json({ error: "id_stock inválido" });
+      return res.status(400).json({
+        error: "id_stock inválido",
+      });
     }
 
-    if (Number.isNaN(cantidad)) {
-      return res.status(400).json({ error: "cantidad inválida" });
+    if (!Number.isFinite(cantidad)) {
+      return res.status(400).json({
+        error: "cantidad inválida",
+      });
     }
 
-    if (Number.isNaN(asignado)) {
-      return res.status(400).json({ error: "asignado inválido" });
+    if (!Number.isFinite(asignado)) {
+      return res.status(400).json({
+        error: "asignado inválido",
+      });
     }
 
     await poolConnect;
+
     const pool = await getPool();
 
-    const result = await pool
-      .request()
+    const result = await pool.request()
       .input("id_stock", sql.Int, idStock)
       .input("cantidad", sql.Decimal(18, 2), cantidad)
       .input("asignado", sql.Decimal(18, 2), asignado)
-      .input("disponible", sql.Decimal(18, 2), disponible)
       .query(`
         UPDATE dbo.stock
-           SET cantidad = @cantidad,
-               asignado = @asignado,
-               disponible = @disponible
-         WHERE id_stock = @id_stock;
+        SET
+          cantidad=@cantidad,
+          asignado=@asignado
+        WHERE id_stock=@id_stock;
 
         SELECT
           s.id_stock,
@@ -457,16 +446,16 @@ exports.updateStock = async (req, res) => {
           a.cod_articulo,
           a.descripcion,
           s.id_deposito,
-          ISNULL(d.nombre, 'SIN DEPÓSITO') AS deposito,
-          ISNULL(s.cantidad, 0) AS cantidad,
-          ISNULL(s.asignado, 0) AS asignado,
-          ISNULL(s.disponible, 0) AS disponible
+          ISNULL(d.nombre,'SIN DEPÓSITO') AS deposito,
+          ISNULL(s.cantidad,0) AS cantidad,
+          ISNULL(s.asignado,0) AS asignado,
+          ISNULL(s.disponible,0) AS disponible
         FROM dbo.stock s
         INNER JOIN dbo.articulos a
-          ON a.id_articulo = s.id_articulo
+          ON a.id_articulo=s.id_articulo
         LEFT JOIN dbo.depositos d
-          ON d.id_deposito = s.id_deposito
-        WHERE s.id_stock = @id_stock;
+          ON d.id_deposito=s.id_deposito
+        WHERE s.id_stock=@id_stock;
       `);
 
     if (!result.recordset.length) {
@@ -475,13 +464,14 @@ exports.updateStock = async (req, res) => {
       });
     }
 
-    res.json({
+    return res.json({
       message: "Stock actualizado correctamente",
       stock: result.recordset[0],
     });
   } catch (err) {
     console.error("Error en stock.updateStock:", err);
-    res.status(500).json({
+
+    return res.status(500).json({
       error: "Error al actualizar stock",
       detalle: err.message,
     });

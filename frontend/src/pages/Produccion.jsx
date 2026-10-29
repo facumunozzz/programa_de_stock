@@ -50,25 +50,51 @@ export default function Produccion() {
   const totalPages = Math.ceil((filtered.length || 0) / itemsPerPage);
 
   const verFormula = async (art) => {
-    setSeleccion({ cod_articulo: art.cod_articulo, descripcion: art.descripcion });
-    setLoadingFormula(true);
-    setErrorFormula('');
-    setFormula([]);
-    try {
-      // ✅ URL y shape correctos del backend
-      const res = await api.get(`/produccion/formulas/${encodeURIComponent(art.cod_articulo)}`);
+  setSeleccion({
+    cod_articulo: art.cod_articulo,
+    cod_barra: art.cod_barra,
+    descripcion: art.descripcion
+  });
 
-      // El backend devuelve { producto, detalle: [...] }
-      const detalle = Array.isArray(res.data?.detalle) ? res.data.detalle : [];
-      setFormula(detalle);
-      setErrorFormula(detalle.length === 0 ? 'No existe fórmula para este código' : '');
-    } catch (err) {
-      const msg = err?.response?.data?.error || err.message || 'Error al obtener la fórmula';
-      setErrorFormula(msg);
-    } finally {
-      setLoadingFormula(false);
+  setLoadingFormula(true);
+  setErrorFormula('');
+  setFormula([]);
+
+  try {
+    const codigoBarra = String(art.cod_barra ?? '').trim();
+
+    if (!codigoBarra) {
+      setErrorFormula('El artículo no tiene código de barras');
+      return;
     }
-  };
+
+    const res = await api.get(
+      `/produccion/formulas/${encodeURIComponent(codigoBarra)}`
+    );
+
+    const detalle = Array.isArray(res.data?.detalle)
+      ? res.data.detalle
+      : [];
+
+    setFormula(detalle);
+
+    if (detalle.length === 0) {
+      setErrorFormula('No existe fórmula para este código');
+    }
+  } catch (err) {
+    console.error('Error obteniendo fórmula:', err);
+
+    const msg =
+      err?.response?.data?.error ||
+      err?.response?.data?.message ||
+      err.message ||
+      'Error al obtener la fórmula';
+
+    setErrorFormula(msg);
+  } finally {
+    setLoadingFormula(false);
+  }
+};
 
   return (
     <div className="articulos-container">

@@ -1,44 +1,87 @@
-body {
+:root {
   font-family: Arial, sans-serif;
+  color: #1f2937;
+  background: #f7f7f7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 320px;
+  min-height: 100%;
   margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
   background-color: #f7f7f7;
 }
 
-.navbar {
-  background-color: #003366;
-  color: white;
-  padding: 10px 20px;
-  display: flex;
-  align-items: center;
+#root {
+  min-height: 100vh;
 }
 
-.navbar h2 {
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.app-content {
+  width: calc(100% - var(--sidebar-width));
+  min-width: 0;
+  min-height: 100vh;
+  margin-left: var(--sidebar-width);
+  padding: calc(var(--navbar-height) + 20px) 10px 30px;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.app-content > * {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.login-content {
+  width: 100%;
+  min-height: 100vh;
   margin: 0;
-  margin-right: 40px;
-  font-size: 20px;
-}
-
-.navbar ul {
-  list-style: none;
-  display: flex;
-  gap: 20px;
   padding: 0;
-  margin: 0;
-}
-
-.navbar ul li a {
-  color: white;
-  text-decoration: none;
-}
-
-.navbar ul li a.active {
-  font-weight: bold;
-  text-decoration: underline;
 }
 
 .container {
-  padding: 20px;
+  width: 100%;
   max-width: 1200px;
-  margin: auto;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
+@media (max-width: 767px) {
+  .app-content {
+    width: 100%;
+    margin-left: 0;
+    padding: calc(var(--navbar-height) + 14px) 8px 20px;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .container {
+    width: 100%;
+    max-width: none;
+    padding: 12px;
+  }
+}
